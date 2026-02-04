@@ -156,8 +156,16 @@ python3 wuxia_crafting_optimizer.py --interactive
 ```
 Step-by-step crafting session with turn-by-turn forecast input. Ideal for playing alongside the game in real-time.
 
+**Turn Flow:**
+1. Show turn status and current state
+2. Show AI-suggested optimal action (using default forecast 1,1,1,1)
+3. Show available skills
+4. Ask for skill selection
+5. Ask for control forecast (only when proceeding to apply skill)
+6. Apply skill with the provided forecast
+
 **Features:**
-- Enter control forecasts each turn (4 values for current + next 3 turns)
+- Enter control forecast once per turn (4 values for current + next 3 turns), only when confirming skill
 - Get AI-suggested optimal action with lookahead plan (displayed only when 2+ actions planned)
 - Accept suggestion or choose a different skill (by number or partial name)
 - Ambiguous skill name detection (prompts for clarification when multiple skills match)
@@ -176,17 +184,22 @@ Step-by-step crafting session with turn-by-turn forecast input. Ideal for playin
 
 **Example session:**
 ```
+  ┌──────────────────────────────────────────────────┐
+  │ ★ SUGGESTED: Simple Fusion                       │
+  │   0 Qi, -10 Stab, +12 Comp                       │
+  └──────────────────────────────────────────────────┘
+
+  Available skills:
+    1. Simple Fusion       0 Qi, -10 Stab, +12 Comp
+    2. Energised Fusion   -10 Qi, -10 Stab, +21 Comp
+    ...
+
+► Select skill [Enter=accept suggestion]: 
 ► Forecast (e.g. '1.5,1,0.5,1') [Enter=default]: 1.5,1,0.5,1
   Forecast: T0: +50% │ T1: normal │ T2: -50% │ T3: normal
 
   ┌──────────────────────────────────────────────────┐
-  │ ★ SUGGESTED: Energised Fusion                    │
-  │   -10 Qi, -10 Stab, +21 Comp                     │
-  └──────────────────────────────────────────────────┘
-
-► Select skill [Enter=accept suggestion]: 
-  ┌──────────────────────────────────────────────────┐
-  │ ✓ Applied: Energised Fusion                      │
+  │ ✓ Applied: Simple Fusion                         │
   └──────────────────────────────────────────────────┘
 ```
 

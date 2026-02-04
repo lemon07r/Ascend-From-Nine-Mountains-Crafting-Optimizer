@@ -6,7 +6,7 @@ A Python tool that finds the best skill rotation for the Ascend From Nine Mounta
 
 ### What This Does
 
-In the game, crafting involves using skills that cost resources (Qi and Stability) to build up Completion and Perfection. Your final score is whichever bar is lower, so you need to balance both.
+In the game, crafting involves using skills that cost resources (Qi and Stability) to build up Completion and Perfection. This tool values both equally and tries to predict the most optimal skill choice to get the highest combination of both. 
 
 This optimizer:
 - Finds the mathematically best rotation of skills
@@ -28,7 +28,7 @@ This optimizer:
 python3 wuxia_crafting_optimizer.py
 ```
 
-This runs an exhaustive search and shows you the best possible skill sequence. With default stats, it achieves a score of 76.
+This runs an exhaustive search and shows you the best possible skill sequence for your configured stats.
 
 **Play along with the game (interactive mode):**
 ```bash
@@ -36,9 +36,10 @@ python3 wuxia_crafting_optimizer.py --interactive
 ```
 
 This is the most useful mode. Each turn:
-1. Enter the control forecast from the game (4 numbers like `1.5,1,0.5,1`)
-2. Get a suggested action
-3. Press Enter to accept, or type a skill name/number to pick something else
+1. See the AI-suggested action (based on default forecast)
+2. Pick a skill (press Enter to accept suggestion, or type a number/name)
+3. Enter the control forecast from the game (4 numbers like `1.5,1,0.5,1`)
+4. The skill is applied with your forecast
 
 ---
 
@@ -100,7 +101,9 @@ Notes:
 
 ---
 
-### Available Skills
+### Available Skills (Default Configuration)
+
+These are the skills included in the default `config.json`. Values can be customized for your character.
 
 | Skill | Qi Cost | Stability Cost | Effect |
 |-------|---------|-----------|--------|
@@ -113,13 +116,15 @@ Notes:
 | Forceful Stabilize | 88 | -40 | Restores stability |
 | Instant Restoration | 44 | -15 | Restores stability |
 
+*Note: Skill costs and effects vary based on your character's stats and configuration.*
+
 ---
 
 ### How the Game Works
 
 **Resources:**
-- **Qi** (max 194): Most skills cost Qi
-- **Stability** (max 60): Most actions cost 10 stability. Stability must stay at **10 or higher** after every action (so you can't take a 10-cost action when you're at 10).
+- **Qi**: Most skills cost Qi. Your max Qi depends on your character (default: 194).
+- **Stability**: Most actions cost stability. Stability must stay at or above the minimum threshold after every action. Your max stability and minimum threshold depend on your character (defaults: max 60, min 10).
 
 **Goals:**
 - **Completion**: Build this up with fusion skills
@@ -127,8 +132,9 @@ Notes:
 - **Score**: The lower of the two (so balance matters)
 
 **Buffs:**
-- Cycling skills grant a 40% buff to either Control or Intensity
-- Buffs last 2 turns and apply to skills used on subsequent turns (not the turn you cast them)
+- Cycling skills grant buffs to either Control or Intensity (default: +40%)
+- Buff duration depends on the skill configuration (default: 2 turns)
+- Buffs apply to skills used on subsequent turns (not the turn you cast them)
 
 ---
 
@@ -163,15 +169,21 @@ $ python3 wuxia_crafting_optimizer.py --interactive
   Completion:   0                    Perfection:   0
   ══► SCORE: 0
 
-► Forecast (e.g. '1.5,1,0.5,1') [Enter=default]: 1,1,1,1
-  Forecast: T0: normal │ T1: normal │ T2: normal │ T3: normal
-
   ┌──────────────────────────────────────────────────┐
   │ ★ SUGGESTED: Energised Fusion                    │
   │   -10 Qi, -10 Stab, +21 Comp                     │
   └──────────────────────────────────────────────────┘
 
+  Available skills:
+  ────────────────────────────────────────────────────────────────
+   ★ 1. Energised Fusion        -10 Qi, -10 Stab, +21 Comp
+     2. Simple Fusion           0 Qi, -10 Stab, +12 Comp
+     ...
+  ────────────────────────────────────────────────────────────────
+
 ► Select skill [Enter=accept suggestion]: 
+► Forecast (e.g. '1.5,1,0.5,1') [Enter=default]: 1,1,1,1
+  Forecast: T0: normal │ T1: normal │ T2: normal │ T3: normal
 ```
 
 ---
