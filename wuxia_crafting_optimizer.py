@@ -596,23 +596,20 @@ def _format_skill_details(optimizer: CraftingOptimizer, skill_key: str, state: S
     elif stability_cost < 0:
         parts.append(f"+{-stability_cost} Stab")
     
-    # Calculate actual gains based on current state
+    # Calculate actual gains based on current state.
+    # Keep this in sync with CraftingOptimizer.apply_skill().
     if skill_key == "disciplined_touch":
-        intensity = state.get_intensity(optimizer.base_intensity)
-        comp_gain = int(intensity * 0.5)
-        perf_gain = int(intensity * 0.5)
+        comp_gain, perf_gain = optimizer.calculate_disciplined_touch(state)
         if comp_gain > 0:
             parts.append(f"+{comp_gain} Comp")
         if perf_gain > 0:
             parts.append(f"+{perf_gain} Perf")
-    elif skill_key == "simple_refine":
+    elif skill_key in ["cycling_refine", "simple_refine"]:
         control = int(state.get_control(optimizer.base_control) * control_condition)
-        perf_gain = control
-        if perf_gain > 0:
-            parts.append(f"+{perf_gain} Perf")
-    elif skill_key == "cycling_refine":
-        control = int(state.get_control(optimizer.base_control) * control_condition)
-        perf_gain = int(control * 0.75)
+        if skill_key == "cycling_refine":
+            perf_gain = 12 * control // 16
+        else:
+            perf_gain = 16 * control // 16
         if perf_gain > 0:
             parts.append(f"+{perf_gain} Perf")
     else:
@@ -756,6 +753,7 @@ def interactive_mode(optimizer: CraftingOptimizer):
         print()
 
         # Get control forecast from user
+        redo_turn = False
         while True:
             try:
                 forecast_input = input("► Forecast (e.g. '1.5,1,0.5,1') [Enter=default]: ").strip()
@@ -765,7 +763,7 @@ def interactive_mode(optimizer: CraftingOptimizer):
 
             if forecast_input.lower() in ('quit', 'q'):
                 print("\n  Goodbye!")
-                break
+                return
             
             if forecast_input.lower() in ('help', 'h'):
                 show_help()
@@ -781,6 +779,7 @@ def interactive_mode(optimizer: CraftingOptimizer):
                     turn -= 1
                     print(f"  ↩ Undone! Back to turn {turn}.")
                     print()
+                    redo_turn = True
                     break  # Re-display the turn
                 else:
                     print("  Nothing to undo.")
@@ -800,13 +799,8 @@ def interactive_mode(optimizer: CraftingOptimizer):
             except argparse.ArgumentTypeError as e:
                 print(f"  ✗ Invalid input: {e}")
                 continue
-        
-        # Check if we should exit or redo turn (from undo)
-        if forecast_input.lower() in ('quit', 'q'):
-            break
-        if forecast_input.lower() in ('undo', 'u') and not state_history:
-            continue
-        if forecast_input.lower() in ('undo', 'u'):
+
+        if redo_turn:
             continue
 
         # Get suggestion
@@ -839,7 +833,9 @@ def interactive_mode(optimizer: CraftingOptimizer):
             for i, k in enumerate(plan, 1):
                 marker = "→" if i == 1 else " "
                 print(f"    {marker} {i}. {optimizer.skills[k][0]}")
-        print()
+            print()
+        else:
+            print()
 
         # Show available skills with details
         print("  Available skills:")
@@ -884,6 +880,7 @@ def interactive_mode(optimizer: CraftingOptimizer):
                     state = state_history.pop()
                     turn -= 1
                     print(f"  ↩ Undone! Back to turn {turn}.")
+                    redo_turn = True
                     break  # Will re-display the turn
                 else:
                     print("  Nothing to undo.")
@@ -911,19 +908,22 @@ def interactive_mode(optimizer: CraftingOptimizer):
             except ValueError:
                 # Try to match by name
                 choice_lower = choice.lower()
-                found = False
+                matches = []
                 for idx, sk in valid_skills:
                     if choice_lower in optimizer.skills[sk][0].lower() or choice_lower == sk:
-                        chosen_key = sk
-                        found = True
-                        break
-                if found:
+                        matches.append((idx, sk))
+                if len(matches) == 1:
+                    chosen_key = matches[0][1]
                     break
+                elif len(matches) > 1:
+                    print(f"  ✗ Ambiguous: '{choice}' matches multiple skills:")
+                    for idx, sk in matches:
+                        print(f"      {idx}. {optimizer.skills[sk][0]}")
+                    print(f"    Please enter the number to select.")
                 else:
                     print(f"  ✗ No skill matching '{choice}'. Try again.")
         
-        # Check if we need to redo turn (from undo)
-        if choice.lower() in ('undo', 'u'):
+        if redo_turn:
             continue
 
         # Apply the chosen skill

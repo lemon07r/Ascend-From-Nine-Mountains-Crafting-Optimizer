@@ -10,7 +10,7 @@ This document provides guidance for AI agents and developers working with the Wu
 
 **Language**: Python 3 (no external dependencies required)
 
-**Main File**: `wuxia_crafting_optimizer.py` (~1100 lines)
+**Main File**: `wuxia_crafting_optimizer.py` (~1120 lines)
 
 ---
 
@@ -152,8 +152,9 @@ Step-by-step crafting session with turn-by-turn forecast input. Ideal for playin
 
 **Features:**
 - Enter control forecasts each turn (4 values for current + next 3 turns)
-- Get AI-suggested optimal action with lookahead plan
-- Accept suggestion or choose a different skill
+- Get AI-suggested optimal action with lookahead plan (displayed only when 2+ actions planned)
+- Accept suggestion or choose a different skill (by number or partial name)
+- Ambiguous skill name detection (prompts for clarification when multiple skills match)
 - Visual progress bars for Qi, Stability, Completion, Perfection
 - Undo support to revert mistakes
 
@@ -164,6 +165,8 @@ Step-by-step crafting session with turn-by-turn forecast input. Ideal for playin
 | `status` / `s` | Show detailed status with progress bars and action history |
 | `undo` / `u` | Undo last action and return to previous turn |
 | `quit` / `q` | Exit interactive mode |
+| `<number>` | Select skill by its number in the list |
+| `<partial name>` | Select skill by partial name match (e.g., "energised") |
 
 **Example session:**
 ```
@@ -179,6 +182,15 @@ Step-by-step crafting session with turn-by-turn forecast input. Ideal for playin
   ┌──────────────────────────────────────────────────┐
   │ ✓ Applied: Energised Fusion                      │
   └──────────────────────────────────────────────────┘
+```
+
+**Ambiguous name handling:**
+```
+► Select skill [Enter=accept suggestion]: simple
+  ✗ Ambiguous: 'simple' matches multiple skills:
+      1. Simple Fusion
+      6. Simple Refine
+    Please enter the number to select.
 ```
 
 ---
