@@ -135,6 +135,12 @@ python3 wuxia_crafting_optimizer.py
 ```
 Outputs: Optimal rotation, detailed step-by-step breakdown, greedy comparison.
 
+### Using a Configuration File
+```bash
+python3 wuxia_crafting_optimizer.py --config config.json
+```
+Load stats and skills from a JSON configuration file instead of using hardcoded defaults. See [Configuration File](#configuration-file) section for format details.
+
 ### Forecast-Aware Suggestion
 ```bash
 python3 wuxia_crafting_optimizer.py --suggest-next --forecast-control '1.5,1,0.5,1'
@@ -195,22 +201,89 @@ Step-by-step crafting session with turn-by-turn forecast input. Ideal for playin
 
 ---
 
+## Configuration File
+
+The optimizer supports loading stats and skills from a JSON configuration file via the `--config` CLI option. If no config file is provided, built-in defaults are used.
+
+### Configuration File Format
+```json
+{
+  "stats": {
+    "max_qi": 194,
+    "max_stability": 60,
+    "base_intensity": 12,
+    "base_control": 16,
+    "min_stability": 10
+  },
+  "skills": {
+    "skill_key": {
+      "name": "Display Name",
+      "qi_cost": 10,
+      "stability_cost": 10,
+      "completion_gain": 0,
+      "perfection_gain": 12,
+      "buff_type": "NONE",
+      "buff_duration": 0
+    }
+  }
+}
+```
+
+### Stats Section
+| Field | Description |
+|-------|-------------|
+| `max_qi` | Maximum Qi pool |
+| `max_stability` | Maximum Stability pool |
+| `base_intensity` | Base Intensity stat (affects completion) |
+| `base_control` | Base Control stat (affects perfection) |
+| `min_stability` | Minimum stability threshold (must restore before dropping below) |
+
+### Skills Section
+Each skill is keyed by a unique identifier (e.g., `simple_fusion`) and contains:
+| Field | Description |
+|-------|-------------|
+| `name` | Human-readable display name |
+| `qi_cost` | Qi consumed when using the skill |
+| `stability_cost` | Stability cost (positive = spend, negative = restore) |
+| `completion_gain` | Base completion gained |
+| `perfection_gain` | Base perfection gained |
+| `buff_type` | One of: `"NONE"`, `"CONTROL"`, `"INTENSITY"` |
+| `buff_duration` | Number of turns the buff lasts |
+
+A default `config.json` file is provided in the project root.
+
+---
+
 ## Common Modification Scenarios
 
 ### Adding a New Skill
-1. Add entry to `self.skills` dictionary in `__init__`
+**Option 1: Via Configuration File (Recommended)**
+1. Add a new skill entry to the `skills` section in your `config.json`
+2. If skill has special scaling logic, add handling in `apply_skill()`
+3. Update the skills table in this document
+
+**Option 2: Via Code**
+1. Add entry to the default config in `load_config()` function
 2. If skill has special scaling logic, add handling in `apply_skill()`
 3. Update the skills table in this document
 
 ### Changing Player Stats
-Modify these values in `CraftingOptimizer.__init__()`:
-```python
-self.max_qi = 194
-self.max_stability = 60
-self.base_intensity = 12
-self.base_control = 16
-self.min_stability = 10
+**Option 1: Via Configuration File (Recommended)**
+Modify the `stats` section in your `config.json`:
+```json
+{
+  "stats": {
+    "max_qi": 194,
+    "max_stability": 60,
+    "base_intensity": 12,
+    "base_control": 16,
+    "min_stability": 10
+  }
+}
 ```
+
+**Option 2: Via Code**
+Modify the default values in the `load_config()` function.
 
 ### Adding New Buff Types
 1. Add to `BuffType` enum
@@ -336,23 +409,27 @@ assert new_state.perfection == 24  # 16 * 1.5 = 24
 ## File Structure
 
 ```
-wuxia_crafting_optimizer.py
-├── BuffType (Enum)
-├── State (dataclass)
-├── CraftingOptimizer
-│   ├── __init__              # Stats and skills config
-│   ├── apply_skill           # Core skill application logic
-│   ├── is_terminal           # Check if game over
-│   ├── search_optimal        # Exhaustive Pareto search
-│   ├── greedy_search         # Quick approximation
-│   ├── simulate_rotation     # Test specific rotation
-│   ├── get_skill_key_from_name  # Lookup skill key by display name
-│   └── print_* methods       # Output formatting
-├── Helper Functions
-│   ├── _parse_control_forecast  # Parse forecast string to list of floats
-│   ├── _make_bar             # Create text-based progress bar
-│   └── _format_skill_details # Format skill costs/gains for display
-├── suggest_next_turn         # DFS lookahead with control forecast
-├── interactive_mode          # Turn-by-turn interactive crafting session
-└── main
+Project Root
+├── config.json                 # Default configuration file (stats and skills)
+├── wuxia_crafting_optimizer.py
+│   ├── BuffType (Enum)
+│   ├── State (dataclass)
+│   ├── load_config             # Load and validate JSON configuration
+│   ├── CraftingOptimizer
+│   │   ├── __init__              # Initialize from config (file or defaults)
+│   │   ├── apply_skill           # Core skill application logic
+│   │   ├── is_terminal           # Check if game over
+│   │   ├── search_optimal        # Exhaustive Pareto search
+│   │   ├── greedy_search         # Quick approximation
+│   │   ├── simulate_rotation     # Test specific rotation
+│   │   ├── get_skill_key_from_name  # Lookup skill key by display name
+│   │   └── print_* methods       # Output formatting
+│   ├── Helper Functions
+│   │   ├── _parse_control_forecast  # Parse forecast string to list of floats
+│   │   ├── _make_bar             # Create text-based progress bar
+│   │   └── _format_skill_details # Format skill costs/gains for display
+│   ├── suggest_next_turn         # DFS lookahead with control forecast
+│   ├── interactive_mode          # Turn-by-turn interactive crafting session
+│   └── main
+└── AGENTS.md                   # This documentation file
 ```

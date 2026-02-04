@@ -11,10 +11,12 @@ Rules:
 """
 
 from dataclasses import dataclass
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple, Optional, Any
 from enum import Enum
 from collections import deque
 import argparse
+import json
+import os
 
 
 class BuffType(Enum):
@@ -73,50 +75,160 @@ class State:
         )
 
 
-class CraftingOptimizer:
-    def __init__(self):
-        # Base stats
-        self.max_qi = 194
-        self.max_stability = 60
-        self.base_intensity = 12
-        self.base_control = 16
-        self.min_stability = 10  # Must restore BEFORE going below this
+def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
+    """Load configuration from a JSON file.
 
-        # Skill definitions: (name, qi_cost, stability_cost, completion_gain, perfection_gain, buff_type, buff_duration)
-        self.skills = {
-            "simple_fusion": ("Simple Fusion", 0, 10, 12, 0, BuffType.NONE, 0),
-            "energised_fusion": ("Energised Fusion", 10, 10, 21, 0, BuffType.NONE, 0),
-            "cycling_fusion": ("Cycling Fusion", 10, 10, 9, 0, BuffType.CONTROL, 2),
-            "disciplined_touch": (
-                "Disciplined Touch",
-                10,
-                10,
-                0,
-                0,
-                BuffType.NONE,
-                0,
-            ),  # Special handling
-            "cycling_refine": ("Cycling Refine", 10, 10, 0, 12, BuffType.INTENSITY, 2),
-            "simple_refine": ("Simple Refine", 18, 10, 0, 16, BuffType.NONE, 0),
-            "forceful_stabilize": (
-                "Forceful Stabilize",
-                88,
-                -40,
-                0,
-                0,
-                BuffType.NONE,
-                0,
-            ),
-            "instant_restoration": (
-                "Instant Restoration",
-                44,
-                -15,
-                0,
-                0,
-                BuffType.NONE,
-                0,
-            ),
+    If config_path is None, returns the default configuration.
+    """
+    if config_path is None:
+        # Return default configuration
+        return {
+            "stats": {
+                "max_qi": 194,
+                "max_stability": 60,
+                "base_intensity": 12,
+                "base_control": 16,
+                "min_stability": 10,
+            },
+            "skills": {
+                "simple_fusion": {
+                    "name": "Simple Fusion",
+                    "qi_cost": 0,
+                    "stability_cost": 10,
+                    "completion_gain": 12,
+                    "perfection_gain": 0,
+                    "buff_type": "NONE",
+                    "buff_duration": 0,
+                },
+                "energised_fusion": {
+                    "name": "Energised Fusion",
+                    "qi_cost": 10,
+                    "stability_cost": 10,
+                    "completion_gain": 21,
+                    "perfection_gain": 0,
+                    "buff_type": "NONE",
+                    "buff_duration": 0,
+                },
+                "cycling_fusion": {
+                    "name": "Cycling Fusion",
+                    "qi_cost": 10,
+                    "stability_cost": 10,
+                    "completion_gain": 9,
+                    "perfection_gain": 0,
+                    "buff_type": "CONTROL",
+                    "buff_duration": 2,
+                },
+                "disciplined_touch": {
+                    "name": "Disciplined Touch",
+                    "qi_cost": 10,
+                    "stability_cost": 10,
+                    "completion_gain": 0,
+                    "perfection_gain": 0,
+                    "buff_type": "NONE",
+                    "buff_duration": 0,
+                },
+                "cycling_refine": {
+                    "name": "Cycling Refine",
+                    "qi_cost": 10,
+                    "stability_cost": 10,
+                    "completion_gain": 0,
+                    "perfection_gain": 12,
+                    "buff_type": "INTENSITY",
+                    "buff_duration": 2,
+                },
+                "simple_refine": {
+                    "name": "Simple Refine",
+                    "qi_cost": 18,
+                    "stability_cost": 10,
+                    "completion_gain": 0,
+                    "perfection_gain": 16,
+                    "buff_type": "NONE",
+                    "buff_duration": 0,
+                },
+                "forceful_stabilize": {
+                    "name": "Forceful Stabilize",
+                    "qi_cost": 88,
+                    "stability_cost": -40,
+                    "completion_gain": 0,
+                    "perfection_gain": 0,
+                    "buff_type": "NONE",
+                    "buff_duration": 0,
+                },
+                "instant_restoration": {
+                    "name": "Instant Restoration",
+                    "qi_cost": 44,
+                    "stability_cost": -15,
+                    "completion_gain": 0,
+                    "perfection_gain": 0,
+                    "buff_type": "NONE",
+                    "buff_duration": 0,
+                },
+            },
         }
+
+    if not os.path.exists(config_path):
+        raise FileNotFoundError(f"Configuration file not found: {config_path}")
+
+    with open(config_path, "r") as f:
+        config = json.load(f)
+
+    # Validate required sections
+    if "stats" not in config:
+        raise ValueError("Configuration file must contain 'stats' section")
+    if "skills" not in config:
+        raise ValueError("Configuration file must contain 'skills' section")
+
+    # Validate required stats
+    required_stats = ["max_qi", "max_stability", "base_intensity", "base_control", "min_stability"]
+    for stat in required_stats:
+        if stat not in config["stats"]:
+            raise ValueError(f"Configuration 'stats' section must contain '{stat}'")
+
+    # Validate skills structure
+    required_skill_fields = ["name", "qi_cost", "stability_cost", "completion_gain", "perfection_gain", "buff_type", "buff_duration"]
+    for skill_key, skill_data in config["skills"].items():
+        for field in required_skill_fields:
+            if field not in skill_data:
+                raise ValueError(f"Skill '{skill_key}' must contain '{field}'")
+        # Validate buff_type
+        if skill_data["buff_type"] not in ["NONE", "CONTROL", "INTENSITY"]:
+            raise ValueError(f"Skill '{skill_key}' has invalid buff_type: {skill_data['buff_type']}")
+
+    return config
+
+
+class CraftingOptimizer:
+    def __init__(self, config_path: Optional[str] = None):
+        # Load configuration
+        config = load_config(config_path)
+
+        # Base stats from config
+        stats = config["stats"]
+        self.max_qi = stats["max_qi"]
+        self.max_stability = stats["max_stability"]
+        self.base_intensity = stats["base_intensity"]
+        self.base_control = stats["base_control"]
+        self.min_stability = stats["min_stability"]  # Must restore BEFORE going below this
+
+        # Convert skills from config format to internal tuple format
+        # Internal format: (name, qi_cost, stability_cost, completion_gain, perfection_gain, buff_type, buff_duration)
+        buff_type_map = {
+            "NONE": BuffType.NONE,
+            "CONTROL": BuffType.CONTROL,
+            "INTENSITY": BuffType.INTENSITY,
+        }
+
+        self.skills = {}
+        for skill_key, skill_data in config["skills"].items():
+            self.skills[skill_key] = (
+                skill_data["name"],
+                skill_data["qi_cost"],
+                skill_data["stability_cost"],
+                skill_data["completion_gain"],
+                skill_data["perfection_gain"],
+                buff_type_map[skill_data["buff_type"]],
+                skill_data["buff_duration"],
+            )
 
     def calculate_disciplined_touch(self, state: State) -> Tuple[int, int]:
         """Disciplined Touch: 6 Completion and 6 Perfection, both scaling with intensity"""
@@ -998,6 +1110,12 @@ def interactive_mode(optimizer: CraftingOptimizer):
 def main():
     parser = argparse.ArgumentParser(description="Wuxia Crafting Optimizer")
     parser.add_argument(
+        "--config",
+        type=str,
+        default=None,
+        help="Path to JSON configuration file for stats and skills. If not provided, uses default values.",
+    )
+    parser.add_argument(
         "--forecast-control",
         type=_parse_control_forecast,
         default=None,
@@ -1018,7 +1136,7 @@ def main():
     )
     args = parser.parse_args()
 
-    optimizer = CraftingOptimizer()
+    optimizer = CraftingOptimizer(config_path=args.config)
 
     print("=" * 70)
     print("WUXIA CRAFTING OPTIMIZER")

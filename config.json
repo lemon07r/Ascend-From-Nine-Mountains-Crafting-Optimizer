@@ -1,0 +1,83 @@
+{
+  "stats": {
+    "max_qi": 194,
+    "max_stability": 60,
+    "base_intensity": 12,
+    "base_control": 16,
+    "min_stability": 10
+  },
+  "skills": {
+    "simple_fusion": {
+      "name": "Simple Fusion",
+      "qi_cost": 0,
+      "stability_cost": 10,
+      "completion_gain": 12,
+      "perfection_gain": 0,
+      "buff_type": "NONE",
+      "buff_duration": 0
+    },
+    "energised_fusion": {
+      "name": "Energised Fusion",
+      "qi_cost": 10,
+      "stability_cost": 10,
+      "completion_gain": 21,
+      "perfection_gain": 0,
+      "buff_type": "NONE",
+      "buff_duration": 0
+    },
+    "cycling_fusion": {
+      "name": "Cycling Fusion",
+      "qi_cost": 10,
+      "stability_cost": 10,
+      "completion_gain": 9,
+      "perfection_gain": 0,
+      "buff_type": "CONTROL",
+      "buff_duration": 2
+    },
+    "disciplined_touch": {
+      "name": "Disciplined Touch",
+      "qi_cost": 10,
+      "stability_cost": 10,
+      "completion_gain": 0,
+      "perfection_gain": 0,
+      "buff_type": "NONE",
+      "buff_duration": 0
+    },
+    "cycling_refine": {
+      "name": "Cycling Refine",
+      "qi_cost": 10,
+      "stability_cost": 10,
+      "completion_gain": 0,
+      "perfection_gain": 12,
+      "buff_type": "INTENSITY",
+      "buff_duration": 2
+    },
+    "simple_refine": {
+      "name": "Simple Refine",
+      "qi_cost": 18,
+      "stability_cost": 10,
+      "completion_gain": 0,
+      "perfection_gain": 16,
+      "buff_type": "NONE",
+      "buff_duration": 0
+    },
+    "forceful_stabilize": {
+      "name": "Forceful Stabilize",
+      "qi_cost": 88,
+      "stability_cost": -40,
+      "completion_gain": 0,
+      "perfection_gain": 0,
+      "buff_type": "NONE",
+      "buff_duration": 0
+    },
+    "instant_restoration": {
+      "name": "Instant Restoration",
+      "qi_cost": 44,
+      "stability_cost": -15,
+      "completion_gain": 0,
+      "perfection_gain": 0,
+      "buff_type": "NONE",
+      "buff_duration": 0
+    }
+  }
+}
