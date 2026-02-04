@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Wuxia Crafting Optimizer
+Ascend From Nine Mountains - Crafting Optimizer
 Finds the optimal skill rotation to maximize completion and perfection
 before running out of stability.
 
@@ -1108,7 +1108,7 @@ def interactive_mode(optimizer: CraftingOptimizer):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Wuxia Crafting Optimizer")
+    parser = argparse.ArgumentParser(description="Ascend From Nine Mountains - Crafting Optimizer")
     parser.add_argument(
         "--config",
         type=str,
@@ -1139,7 +1139,7 @@ def main():
     optimizer = CraftingOptimizer(config_path=args.config)
 
     print("=" * 70)
-    print("WUXIA CRAFTING OPTIMIZER")
+    print("ASCEND FROM NINE MOUNTAINS - CRAFTING OPTIMIZER")
     print("=" * 70)
     print(f"\nYour Stats:")
     print(f"  Max Qi: {optimizer.max_qi}")

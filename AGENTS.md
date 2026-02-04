@@ -1,12 +1,12 @@
-# AGENTS.md - Wuxia Crafting Optimizer
+# AGENTS.md - Ascend From Nine Mountains Crafting Optimizer
 
-This document provides guidance for AI agents and developers working with the Wuxia Crafting Optimizer codebase.
+This document provides guidance for AI agents and developers working with the Ascend From Nine Mountains Crafting Optimizer codebase.
 
 ---
 
 ## Project Overview
 
-**Purpose**: This script finds the optimal skill rotation for a wuxia game crafting system. The goal is to maximize both completion and perfection bars before running out of stability.
+**Purpose**: This script finds the optimal skill rotation for the Ascend From Nine Mountains crafting system. The goal is to maximize both completion and perfection bars before running out of stability.
 
 **Language**: Python 3 (no external dependencies required)
 
