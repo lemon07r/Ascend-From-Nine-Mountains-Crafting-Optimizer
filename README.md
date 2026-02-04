@@ -6,12 +6,12 @@ A Python tool that finds the best skill rotation for the Ascend From Nine Mounta
 
 ### What This Does
 
-In the game, crafting involves using skills that cost resources (Qi and Stability) to build up Completion and Perfection. You can set specific targets for both values, and the optimizer will find the most efficient path to reach them.
+In the game, crafting involves using skills that cost resources (Qi and Stability) to build up Completion and Perfection. You can set specific targets for both values, and the optimizer will find an optimal rotation to reach them under its scoring rules.
 
 This optimizer:
 - Finds the mathematically best rotation of skills to reach your targets
 - Lets you play along with the game in real-time with turn-by-turn suggestions
-- Accounts for the random control conditions the game throws at you
+- Accounts for the random control conditions the game throws at you (in interactive mode and `--suggest-next`)
 - Supports both target-based optimization and legacy balanced scoring
 
 ---
@@ -44,10 +44,10 @@ python3 wuxia_crafting_optimizer.py -i -t 60 60
 ```
 
 This is the most useful mode. Each turn:
-1. See the AI-suggested action (based on default forecast)
-2. Pick a skill (press Enter to accept suggestion, or type a number/name)
-3. Enter the control forecast from the game (4 numbers like `1.5,1,0.5,1`)
-4. The skill is applied with your forecast
+1. Enter the control forecast from the game (Turn 1: 4 values; Turn 2+: 1 value to extend, or 4 values to override)
+2. See the AI-suggested action (calculated using your forecast)
+3. Pick a skill (press Enter to accept suggestion, or type a number/name)
+4. The skill is applied using the current-turn forecast value (T0)
 5. Session ends automatically when both targets are met
 
 ---
@@ -57,7 +57,7 @@ This is the most useful mode. Each turn:
 | Command | What it does |
 |---------|--------------|
 | Enter | Accept the suggested skill |
-| `1-8` | Pick a skill by its number |
+| `<number>` | Pick a skill by its number |
 | `undo` or `u` | Go back one turn |
 | `status` or `s` | Show detailed progress |
 | `help` or `h` | Show help |

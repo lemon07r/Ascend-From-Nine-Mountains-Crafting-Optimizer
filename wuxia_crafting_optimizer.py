@@ -694,7 +694,7 @@ class CraftingOptimizer:
         for key, skill in self.skills.items():
             if skill[0] == name:
                 return key
-        return name
+        raise ValueError(f"Unknown skill display name: {name}")
 
 
 def _parse_control_forecast(s: str) -> List[float]:
@@ -1157,6 +1157,7 @@ def interactive_mode(optimizer: CraftingOptimizer, target_completion: int = 0, t
             if choice.lower() in ('undo', 'u'):
                 if state_history:
                     state = state_history.pop()
+                    current_forecast = forecast_history.pop() if forecast_history else None
                     turn -= 1
                     print(f"  ↩ Undone! Back to turn {turn}.")
                     redo_turn = True

@@ -459,7 +459,7 @@ Without targets, maximizes `min(completion, perfection)`:
 **Final**: Completion=80, Perfection=76, Score=76
 
 ### Target Mode Example (Targets: 50/50)
-With `-t 50 50`, finds shortest path to targets:
+With `-t 50 50`, finds an optimal rotation to reach targets under the capped target-mode score (it may stop early as soon as both targets are met):
 
 ```
 1. Energised Fusion      (+21 Completion)
