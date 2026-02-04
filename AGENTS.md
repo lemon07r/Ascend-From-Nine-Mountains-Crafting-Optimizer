@@ -298,7 +298,7 @@ Each skill is keyed by a unique identifier (e.g., `simple_fusion`) and contains:
 | `buff_type` | One of: `"NONE"`, `"CONTROL"`, `"INTENSITY"` |
 | `buff_duration` | Number of turns the buff lasts |
 
-A default `config.json` file is provided in the project root.
+A default `config.json` file is provided in the project root and is loaded automatically when no `--config` path is provided.
 
 ---
 

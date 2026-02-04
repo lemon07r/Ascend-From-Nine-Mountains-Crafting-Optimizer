@@ -5,7 +5,7 @@ Finds the optimal skill rotation to reach target completion and perfection
 before running out of stability.
 
 Rules:
-- Each action costs 10 stability unless it restores stability
+- Most actions cost stability; see the skill list/config for exact costs
 - Stability MUST be restored BEFORE going below 10
 - Goal: Reach target completion and perfection values
 """
@@ -76,10 +76,6 @@ class State:
         """Total of completion and perfection"""
         return self.completion + self.perfection
 
-    def __lt__(self, other):
-        """For priority queue - higher score is better"""
-        return self.get_score(0, 0) > other.get_score(0, 0)
-
     def __str__(self):
         return (
             f"Qi: {self.qi}, Stability: {self.stability}, "
@@ -90,93 +86,98 @@ class State:
 def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
     """Load configuration from a JSON file.
 
-    If config_path is None, returns the default configuration.
+    If config_path is None, loads `config.json` from next to this script when present,
+    otherwise returns the embedded default configuration.
     """
     if config_path is None:
-        # Return default configuration
-        return {
-            "stats": {
-                "max_qi": 194,
-                "max_stability": 60,
-                "base_intensity": 12,
-                "base_control": 16,
-                "min_stability": 10,
-            },
-            "skills": {
-                "simple_fusion": {
-                    "name": "Simple Fusion",
-                    "qi_cost": 0,
-                    "stability_cost": 10,
-                    "completion_gain": 12,
-                    "perfection_gain": 0,
-                    "buff_type": "NONE",
-                    "buff_duration": 0,
+        default_path = os.path.join(os.path.dirname(__file__), "config.json")
+        if os.path.exists(default_path):
+            config_path = default_path
+        else:
+            # Return embedded default configuration
+            return {
+                "stats": {
+                    "max_qi": 194,
+                    "max_stability": 60,
+                    "base_intensity": 12,
+                    "base_control": 16,
+                    "min_stability": 10,
                 },
-                "energised_fusion": {
-                    "name": "Energised Fusion",
-                    "qi_cost": 10,
-                    "stability_cost": 10,
-                    "completion_gain": 21,
-                    "perfection_gain": 0,
-                    "buff_type": "NONE",
-                    "buff_duration": 0,
+                "skills": {
+                    "simple_fusion": {
+                        "name": "Simple Fusion",
+                        "qi_cost": 0,
+                        "stability_cost": 10,
+                        "completion_gain": 12,
+                        "perfection_gain": 0,
+                        "buff_type": "NONE",
+                        "buff_duration": 0,
+                    },
+                    "energised_fusion": {
+                        "name": "Energised Fusion",
+                        "qi_cost": 10,
+                        "stability_cost": 10,
+                        "completion_gain": 21,
+                        "perfection_gain": 0,
+                        "buff_type": "NONE",
+                        "buff_duration": 0,
+                    },
+                    "cycling_fusion": {
+                        "name": "Cycling Fusion",
+                        "qi_cost": 10,
+                        "stability_cost": 10,
+                        "completion_gain": 9,
+                        "perfection_gain": 0,
+                        "buff_type": "CONTROL",
+                        "buff_duration": 2,
+                    },
+                    "disciplined_touch": {
+                        "name": "Disciplined Touch",
+                        "qi_cost": 10,
+                        "stability_cost": 10,
+                        "completion_gain": 0,
+                        "perfection_gain": 0,
+                        "buff_type": "NONE",
+                        "buff_duration": 0,
+                    },
+                    "cycling_refine": {
+                        "name": "Cycling Refine",
+                        "qi_cost": 10,
+                        "stability_cost": 10,
+                        "completion_gain": 0,
+                        "perfection_gain": 12,
+                        "buff_type": "INTENSITY",
+                        "buff_duration": 2,
+                    },
+                    "simple_refine": {
+                        "name": "Simple Refine",
+                        "qi_cost": 18,
+                        "stability_cost": 10,
+                        "completion_gain": 0,
+                        "perfection_gain": 16,
+                        "buff_type": "NONE",
+                        "buff_duration": 0,
+                    },
+                    "forceful_stabilize": {
+                        "name": "Forceful Stabilize",
+                        "qi_cost": 88,
+                        "stability_cost": -40,
+                        "completion_gain": 0,
+                        "perfection_gain": 0,
+                        "buff_type": "NONE",
+                        "buff_duration": 0,
+                    },
+                    "instant_restoration": {
+                        "name": "Instant Restoration",
+                        "qi_cost": 44,
+                        "stability_cost": -15,
+                        "completion_gain": 0,
+                        "perfection_gain": 0,
+                        "buff_type": "NONE",
+                        "buff_duration": 0,
+                    },
                 },
-                "cycling_fusion": {
-                    "name": "Cycling Fusion",
-                    "qi_cost": 10,
-                    "stability_cost": 10,
-                    "completion_gain": 9,
-                    "perfection_gain": 0,
-                    "buff_type": "CONTROL",
-                    "buff_duration": 2,
-                },
-                "disciplined_touch": {
-                    "name": "Disciplined Touch",
-                    "qi_cost": 10,
-                    "stability_cost": 10,
-                    "completion_gain": 0,
-                    "perfection_gain": 0,
-                    "buff_type": "NONE",
-                    "buff_duration": 0,
-                },
-                "cycling_refine": {
-                    "name": "Cycling Refine",
-                    "qi_cost": 10,
-                    "stability_cost": 10,
-                    "completion_gain": 0,
-                    "perfection_gain": 12,
-                    "buff_type": "INTENSITY",
-                    "buff_duration": 2,
-                },
-                "simple_refine": {
-                    "name": "Simple Refine",
-                    "qi_cost": 18,
-                    "stability_cost": 10,
-                    "completion_gain": 0,
-                    "perfection_gain": 16,
-                    "buff_type": "NONE",
-                    "buff_duration": 0,
-                },
-                "forceful_stabilize": {
-                    "name": "Forceful Stabilize",
-                    "qi_cost": 88,
-                    "stability_cost": -40,
-                    "completion_gain": 0,
-                    "perfection_gain": 0,
-                    "buff_type": "NONE",
-                    "buff_duration": 0,
-                },
-                "instant_restoration": {
-                    "name": "Instant Restoration",
-                    "qi_cost": 44,
-                    "stability_cost": -15,
-                    "completion_gain": 0,
-                    "perfection_gain": 0,
-                    "buff_type": "NONE",
-                    "buff_duration": 0,
-                },
-            },
-        }
+            }
 
     if not os.path.exists(config_path):
         raise FileNotFoundError(f"Configuration file not found: {config_path}")
@@ -449,11 +450,23 @@ class CraftingOptimizer:
         best_res = start_res
         best_idx = 0
 
+        target_score_cap = 0
+        target_mode = target_completion > 0 and target_perfection > 0
+        if target_mode:
+            target_score_cap = target_completion + target_perfection
+
         while q:
             res, idx = q.popleft()
             node = frontier[res][idx]
-            if node.score(target_completion, target_perfection) > frontier[best_res][best_idx].score(target_completion, target_perfection):
+            node_score = node.score(target_completion, target_perfection)
+            if node_score > frontier[best_res][best_idx].score(target_completion, target_perfection):
                 best_res, best_idx = res, idx
+
+            # In target mode, the score is capped at (target_completion + target_perfection).
+            # As soon as we reach that cap, we have an optimal solution and can stop.
+            if target_mode and node_score >= target_score_cap:
+                best_res, best_idx = res, idx
+                break
 
             state = State(
                 qi=res.qi,
@@ -596,7 +609,13 @@ class CraftingOptimizer:
         for i, action in enumerate(state.history, 1):
             print(f"    {i}. {action}")
 
-    def print_detailed_rotation(self, rotation_keys: List[str], control_conditions: Optional[List[float]] = None):
+    def print_detailed_rotation(
+        self,
+        rotation_keys: List[str],
+        target_completion: int = 0,
+        target_perfection: int = 0,
+        control_conditions: Optional[List[float]] = None,
+    ):
         """Print detailed step-by-step breakdown of a rotation.
 
         If `control_conditions` is provided, it is used as per-turn control multipliers
@@ -632,7 +651,8 @@ class CraftingOptimizer:
 
             new_state = self.apply_skill(state, skill_key, control_condition=cond)
             if new_state is None:
-                print(f"  {i}. {skill_key} - FAILED (insufficient resources)")
+                skill_name = self.skills[skill_key][0]
+                print(f"  {i}. {skill_name} - FAILED (insufficient resources)")
                 break
 
             qi_change = new_state.qi - old_qi
@@ -663,7 +683,11 @@ class CraftingOptimizer:
             state = new_state
 
         print(f"  {'='*70}")
-        print(f"  Final: Completion={state.completion}, Perfection={state.perfection}, Score={state.get_score()}")
+        if target_completion > 0 or target_perfection > 0:
+            score = state.get_score(target_completion, target_perfection)
+        else:
+            score = state.get_score()
+        print(f"  Final: Completion={state.completion}, Perfection={state.perfection}, Score={score}")
 
     def get_skill_key_from_name(self, name: str) -> str:
         """Get skill key from display name"""
@@ -877,8 +901,20 @@ def interactive_mode(optimizer: CraftingOptimizer, target_completion: int = 0, t
         print("├" + "─" * 68 + "┤")
         print(f"│  Qi:         {state.qi:3d}/{optimizer.max_qi}  {_make_bar(state.qi, optimizer.max_qi, 30)}  │")
         print(f"│  Stability:  {state.stability:3d}/{optimizer.max_stability}   {_make_bar(state.stability, optimizer.max_stability, 30)}  │")
-        print(f"│  Completion: {state.completion:3d}      {_make_bar(state.completion, 100, 30)}  │")
-        print(f"│  Perfection: {state.perfection:3d}      {_make_bar(state.perfection, 100, 30)}  │")
+        if target_completion > 0 and target_perfection > 0:
+            print(
+                f"│  Completion: {state.completion:3d}/{target_completion:<3d}  "
+                f"{_make_bar(state.completion, target_completion, 30)}  │"
+            )
+            print(
+                f"│  Perfection: {state.perfection:3d}/{target_perfection:<3d}  "
+                f"{_make_bar(state.perfection, target_perfection, 30)}  │"
+            )
+        else:
+            comp_scale = max(100, state.completion)
+            perf_scale = max(100, state.perfection)
+            print(f"│  Completion: {state.completion:3d}      {_make_bar(state.completion, comp_scale, 30)}  │")
+            print(f"│  Perfection: {state.perfection:3d}      {_make_bar(state.perfection, perf_scale, 30)}  │")
         print("├" + "─" * 68 + "┤")
         eff_intensity = state.get_intensity(optimizer.base_intensity)
         eff_control = state.get_control(optimizer.base_control)
@@ -1219,7 +1255,10 @@ def main():
         "--config",
         type=str,
         default=None,
-        help="Path to JSON configuration file for stats and skills. If not provided, uses default values.",
+        help=(
+            "Path to JSON configuration file for stats and skills. "
+            "If not provided, loads ./config.json when present, otherwise uses embedded defaults."
+        ),
     )
     parser.add_argument(
         "-f", "--forecast-control",
@@ -1282,7 +1321,7 @@ def main():
     print(f"  Intensity: {optimizer.base_intensity} (affects completion)")
     print(f"  Control: {optimizer.base_control} (affects perfection)")
     print(f"\nRules:")
-    print(f"  - Each action costs 10 stability (except restoration skills)")
+    print(f"  - Most actions cost stability; see skills/config for exact costs")
     print(f"  - Stability must stay >= {optimizer.min_stability} (restore before dropping below)")
     if args.target_completion > 0 and args.target_perfection > 0:
         print(f"  - Goal: Reach Completion={args.target_completion}, Perfection={args.target_perfection}")
@@ -1332,7 +1371,12 @@ def main():
             print(f"Best {len(plan)}-turn plan (within forecast horizon):")
             for i, k in enumerate(plan, 1):
                 print(f"  {i}. {optimizer.skills[k][0]}")
-            optimizer.print_detailed_rotation(plan, control_conditions=args.forecast_control)
+            optimizer.print_detailed_rotation(
+                plan,
+                target_completion=args.target_completion,
+                target_perfection=args.target_perfection,
+                control_conditions=args.forecast_control,
+            )
         if args.target_completion > 0 and args.target_perfection > 0:
             print(f"\nHorizon progress after lookahead: {horizon_score}/{args.target_completion + args.target_perfection}")
         else:
@@ -1357,7 +1401,11 @@ def main():
     for name in optimal_state.history:
         rotation_keys.append(optimizer.get_skill_key_from_name(name))
 
-    optimizer.print_detailed_rotation(rotation_keys)
+    optimizer.print_detailed_rotation(
+        rotation_keys,
+        target_completion=args.target_completion,
+        target_perfection=args.target_perfection,
+    )
 
     # Also run greedy for comparison
     print("\n" + "-" * 70)

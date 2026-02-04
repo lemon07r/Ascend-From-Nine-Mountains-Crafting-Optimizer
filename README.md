@@ -96,7 +96,9 @@ If your character has different stats, create or edit `config.json`:
 }
 ```
 
-Then run with:
+By default, the script will load `config.json` from the project directory (next to `wuxia_crafting_optimizer.py`) when it exists.
+
+You can also specify a config path explicitly:
 ```bash
 python3 wuxia_crafting_optimizer.py --config config.json
 ```
