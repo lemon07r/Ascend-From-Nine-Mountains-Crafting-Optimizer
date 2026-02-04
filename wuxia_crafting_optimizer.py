@@ -877,7 +877,7 @@ def _format_skill_details(
 ) -> str:
     """Format skill details showing costs and expected gains."""
     skill = optimizer.skills[skill_key]
-    name, qi_cost, stability_cost, base_comp, base_perf, buff_type, buff_dur = skill
+    name, qi_cost, stability_cost, base_comp, base_perf, buff_type, buff_dur, _ = skill
 
     parts = []
 
