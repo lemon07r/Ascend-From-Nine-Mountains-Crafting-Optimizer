@@ -238,6 +238,31 @@ class CraftingOptimizer:
         perfection = 6 * intensity // 12
         return completion, perfection
 
+    def calculate_skill_gains(self, state: State, skill_key: str, control_condition: float = 1.0) -> Tuple[int, int]:
+        """Return (completion_gain, perfection_gain) for `skill_key` using the CURRENT state's buffs.
+
+        Important: this must not apply any NEW buffs granted by the skill itself (those only affect
+        subsequent turns).
+        """
+
+        _, _, _, base_comp, base_perf, _, _ = self.skills[skill_key]
+        completion_gain = base_comp
+        perfection_gain = base_perf
+
+        if skill_key == "disciplined_touch":
+            completion_gain, perfection_gain = self.calculate_disciplined_touch(state)
+        elif skill_key in ["cycling_refine", "simple_refine"]:
+            # These scale with control (from EXISTING buffs, not new ones)
+            # plus a per-turn external control condition (e.g. +/- 50%).
+            control = int(state.get_control(self.base_control) * control_condition)
+            if skill_key == "cycling_refine":
+                perfection_gain = 12 * control // 16  # Base is 12 at 16 control
+            else:  # simple_refine
+                perfection_gain = 16 * control // 16
+            completion_gain = 0
+
+        return completion_gain, perfection_gain
+
     def apply_skill(self, state: State, skill_key: str, control_condition: float = 1.0) -> Optional[State]:
         """Apply a skill and return new state, or None if invalid.
 
@@ -268,16 +293,7 @@ class CraftingOptimizer:
 
         # Calculate gains BEFORE applying buffs from this skill
         # (buffs from cycling skills apply to NEXT turns, not this turn)
-        if skill_key == "disciplined_touch":
-            completion_gain, perfection_gain = self.calculate_disciplined_touch(state)
-        elif skill_key in ["cycling_refine", "simple_refine"]:
-            # These scale with control (from EXISTING buffs, not new ones)
-            # plus a per-turn external control condition (e.g. +/- 50%).
-            control = int(state.get_control(self.base_control) * control_condition)
-            if skill_key == "cycling_refine":
-                perfection_gain = 12 * control // 16  # Base is 12 at 16 control
-            else:  # simple_refine
-                perfection_gain = 16 * control // 16
+        completion_gain, perfection_gain = self.calculate_skill_gains(state, skill_key, control_condition=control_condition)
 
         # Apply costs
         new_state.qi -= qi_cost
@@ -708,27 +724,11 @@ def _format_skill_details(optimizer: CraftingOptimizer, skill_key: str, state: S
     elif stability_cost < 0:
         parts.append(f"+{-stability_cost} Stab")
     
-    # Calculate actual gains based on current state.
-    # Keep this in sync with CraftingOptimizer.apply_skill().
-    if skill_key == "disciplined_touch":
-        comp_gain, perf_gain = optimizer.calculate_disciplined_touch(state)
-        if comp_gain > 0:
-            parts.append(f"+{comp_gain} Comp")
-        if perf_gain > 0:
-            parts.append(f"+{perf_gain} Perf")
-    elif skill_key in ["cycling_refine", "simple_refine"]:
-        control = int(state.get_control(optimizer.base_control) * control_condition)
-        if skill_key == "cycling_refine":
-            perf_gain = 12 * control // 16
-        else:
-            perf_gain = 16 * control // 16
-        if perf_gain > 0:
-            parts.append(f"+{perf_gain} Perf")
-    else:
-        if base_comp > 0:
-            parts.append(f"+{base_comp} Comp")
-        if base_perf > 0:
-            parts.append(f"+{base_perf} Perf")
+    comp_gain, perf_gain = optimizer.calculate_skill_gains(state, skill_key, control_condition=control_condition)
+    if comp_gain > 0:
+        parts.append(f"+{comp_gain} Comp")
+    if perf_gain > 0:
+        parts.append(f"+{perf_gain} Perf")
     
     # Buff
     if buff_type == BuffType.CONTROL:
@@ -764,7 +764,7 @@ def interactive_mode(optimizer: CraftingOptimizer):
 
     print()
     print("╔" + "═" * 68 + "╗")
-    print("║" + " WUXIA CRAFTING - INTERACTIVE MODE ".center(68) + "║")
+    print("║" + " ASCEND FROM NINE MOUNTAINS - INTERACTIVE MODE ".center(68) + "║")
     print("╚" + "═" * 68 + "╝")
     print()
     print("┌" + "─" * 68 + "┐")

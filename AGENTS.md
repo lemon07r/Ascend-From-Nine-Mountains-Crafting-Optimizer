@@ -103,7 +103,7 @@ self.skills = {
 | Forceful Stabilize | 88 | -40 | 0 | 0 | None |
 | Instant Restoration | 44 | -15 | 0 | 0 | None |
 
-*Scales with stats/buffs
+*Scales with stats/buffs. `Disciplined Touch` scales with **Intensity only** (not `control_condition`). `Cycling Refine` and `Simple Refine` scale with **Control** and are affected by `control_condition`.
 
 ---
 

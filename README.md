@@ -93,20 +93,25 @@ python3 wuxia_crafting_optimizer.py --config config.json
 
 A default `config.json` is included in the project. You can copy and modify it for your character.
 
+Notes:
+- In `config.json`, `stability_cost > 0` means you **spend** stability (usually `10`), and `stability_cost < 0` means you **restore** stability.
+- `buff_type` must be one of: `"NONE"`, `"CONTROL"`, `"INTENSITY"`.
+- `Disciplined Touch` scales with your Intensity stat, so its `completion_gain` / `perfection_gain` are `0` in `config.json` by design (the gains are computed in code).
+
 ---
 
 ### Available Skills
 
-| Skill | Qi Cost | Stability | Effect |
+| Skill | Qi Cost | Stability Cost | Effect |
 |-------|---------|-----------|--------|
-| Simple Fusion | 0 | -10 | +12 Completion |
-| Energised Fusion | 10 | -10 | +21 Completion |
-| Cycling Fusion | 10 | -10 | +9 Completion, grants Control buff |
-| Disciplined Touch | 10 | -10 | +6 Completion, +6 Perfection (scales with Intensity) |
-| Cycling Refine | 10 | -10 | +12 Perfection, grants Intensity buff |
-| Simple Refine | 18 | -10 | +16 Perfection (scales with Control) |
-| Forceful Stabilize | 88 | +40 | Restores stability |
-| Instant Restoration | 44 | +15 | Restores stability |
+| Simple Fusion | 0 | 10 | +12 Completion |
+| Energised Fusion | 10 | 10 | +21 Completion |
+| Cycling Fusion | 10 | 10 | +9 Completion, grants Control buff |
+| Disciplined Touch | 10 | 10 | +6 Completion, +6 Perfection (scales with Intensity) |
+| Cycling Refine | 10 | 10 | +12 Perfection, grants Intensity buff |
+| Simple Refine | 18 | 10 | +16 Perfection (scales with Control) |
+| Forceful Stabilize | 88 | -40 | Restores stability |
+| Instant Restoration | 44 | -15 | Restores stability |
 
 ---
 
@@ -114,7 +119,7 @@ A default `config.json` is included in the project. You can copy and modify it f
 
 **Resources:**
 - **Qi** (max 194): Most skills cost Qi
-- **Stability** (max 60): Each action costs 10 stability. You must restore before dropping below 10.
+- **Stability** (max 60): Most actions cost 10 stability. Stability must stay at **10 or higher** after every action (so you can't take a 10-cost action when you're at 10).
 
 **Goals:**
 - **Completion**: Build this up with fusion skills
@@ -132,25 +137,37 @@ A default `config.json` is included in the project. You can copy and modify it f
 ```
 $ python3 wuxia_crafting_optimizer.py --interactive
 
-══════════════════════════════════════════════════════════════════════
-                         INTERACTIVE CRAFTING
-══════════════════════════════════════════════════════════════════════
+╔════════════════════════════════════════════════════════════════════╗
+║          ASCEND FROM NINE MOUNTAINS - INTERACTIVE MODE             ║
+╚════════════════════════════════════════════════════════════════════╝
 
-  Type 'help' for commands, 'quit' to exit.
+┌────────────────────────────────────────────────────────────────────┐
+│                             COMMANDS                               │
+├────────────────────────────────────────────────────────────────────┤
+│  Forecast: Enter 4 control multipliers (e.g. '1.5,1,0.5,1')        │
+│            Press Enter for default (1,1,1,1)                       │
+│                                                                    │
+│  Actions:  Enter number or name to select skill                    │
+│            Press Enter to accept suggestion                        │
+│                                                                    │
+│  Other:    'help' or 'h' - Show this help                          │
+│            'undo' or 'u' - Undo last action                        │
+│            'status' or 's' - Show detailed status                  │
+│            'quit' or 'q' - Exit interactive mode                   │
+└────────────────────────────────────────────────────────────────────┘
 
-────────────────────────────────────────────────────────────────────────
-  TURN 1
-────────────────────────────────────────────────────────────────────────
-  Qi:         194/194  ████████████████████████████████████████
-  Stability:   60/60   ████████████████████████████████████████
-  Completion:   0      ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-  Perfection:   0      ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+┌────────────────────────────────────────────────────────────────────┐
+│                              TURN 1                                │
+└────────────────────────────────────────────────────────────────────┘
+  Qi: 194/194 ███████████████   Stability: 60/60 ███████████████
+  Completion:   0                    Perfection:   0
+  ══► SCORE: 0
 
 ► Forecast (e.g. '1.5,1,0.5,1') [Enter=default]: 1,1,1,1
   Forecast: T0: normal │ T1: normal │ T2: normal │ T3: normal
 
   ┌──────────────────────────────────────────────────┐
-  │ SUGGESTED: Energised Fusion                      │
+  │ ★ SUGGESTED: Energised Fusion                    │
   │   -10 Qi, -10 Stab, +21 Comp                     │
   └──────────────────────────────────────────────────┘
 
