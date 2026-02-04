@@ -14,7 +14,8 @@
       "completion_gain": 12,
       "perfection_gain": 0,
       "buff_type": "NONE",
-      "buff_duration": 0
+      "buff_duration": 0,
+      "prevents_max_stability_decay": false
     },
     "energised_fusion": {
       "name": "Energised Fusion",
@@ -23,7 +24,8 @@
       "completion_gain": 21,
       "perfection_gain": 0,
       "buff_type": "NONE",
-      "buff_duration": 0
+      "buff_duration": 0,
+      "prevents_max_stability_decay": false
     },
     "cycling_fusion": {
       "name": "Cycling Fusion",
@@ -32,7 +34,8 @@
       "completion_gain": 9,
       "perfection_gain": 0,
       "buff_type": "CONTROL",
-      "buff_duration": 2
+      "buff_duration": 2,
+      "prevents_max_stability_decay": false
     },
     "disciplined_touch": {
       "name": "Disciplined Touch",
@@ -41,7 +44,8 @@
       "completion_gain": 0,
       "perfection_gain": 0,
       "buff_type": "NONE",
-      "buff_duration": 0
+      "buff_duration": 0,
+      "prevents_max_stability_decay": false
     },
     "cycling_refine": {
       "name": "Cycling Refine",
@@ -50,7 +54,8 @@
       "completion_gain": 0,
       "perfection_gain": 12,
       "buff_type": "INTENSITY",
-      "buff_duration": 2
+      "buff_duration": 2,
+      "prevents_max_stability_decay": false
     },
     "simple_refine": {
       "name": "Simple Refine",
@@ -59,7 +64,8 @@
       "completion_gain": 0,
       "perfection_gain": 16,
       "buff_type": "NONE",
-      "buff_duration": 0
+      "buff_duration": 0,
+      "prevents_max_stability_decay": false
     },
     "forceful_stabilize": {
       "name": "Forceful Stabilize",
@@ -68,7 +74,8 @@
       "completion_gain": 0,
       "perfection_gain": 0,
       "buff_type": "NONE",
-      "buff_duration": 0
+      "buff_duration": 0,
+      "prevents_max_stability_decay": true
     },
     "instant_restoration": {
       "name": "Instant Restoration",
@@ -77,7 +84,8 @@
       "completion_gain": 0,
       "perfection_gain": 0,
       "buff_type": "NONE",
-      "buff_duration": 0
+      "buff_duration": 0,
+      "prevents_max_stability_decay": true
     }
   }
 }
