@@ -6,7 +6,7 @@ This document provides guidance for AI agents and developers working with the As
 
 ## Project Overview
 
-**Purpose**: This script finds the optimal skill rotation for the Ascend From Nine Mountains crafting system. The goal is to maximize both completion and perfection bars before running out of stability.
+**Purpose**: This script finds the optimal skill rotation for the Ascend From Nine Mountains crafting system. The goal is to reach specific completion and perfection targets, or maximize both bars before running out of stability.
 
 **Language**: Python 3 (no external dependencies required)
 
@@ -28,7 +28,9 @@ Understanding these rules is essential for any modifications:
 
 ### Core Rules
 1. **Stability Constraint**: Stability MUST stay `>= 10` after every action. You may end a turn at exactly `10`, but then you must restore next (you cannot take another `-10` action).
-2. **Scoring**: Final score = `min(completion, perfection)` — both bars must be balanced.
+2. **Scoring**: 
+   - **Target Mode**: When `--target-completion` and `--target-perfection` are provided, score = sum of progress toward each target (capped at target values). Optimization stops when both targets are met.
+   - **Legacy Mode**: Without targets, score = `min(completion, perfection)` — both bars must be balanced.
 3. **Buff Timing**: Buffs from cycling skills apply to SUBSEQUENT turns, not the current turn.
 4. **Control Conditions**: Random game conditions can modify Control by ±50% per turn.
 
@@ -61,7 +63,8 @@ class State:
 ```
 
 Key methods:
-- `get_score()` → `min(completion, perfection)`
+- `get_score(target_completion=0, target_perfection=0)` → With targets: sum of progress toward each (capped). Without targets: `min(completion, perfection)`
+- `targets_met(target_completion, target_perfection)` → Returns `True` if both targets are reached
 - `get_control(base)` → applies buff if active
 - `get_intensity(base)` → applies buff if active
 
@@ -112,16 +115,19 @@ self.skills = {
 ### 1. Exhaustive Search with Pareto Pruning (`search_optimal`)
 - **Method**: BFS with Pareto-frontier pruning
 - **Pruning**: For each resource state (qi, stability, buffs), only keeps non-dominated (completion, perfection) pairs
-- **Returns**: Globally optimal rotation achieving score 76
+- **Parameters**: `target_completion=0, target_perfection=0` — when provided, optimizes toward targets and stops early when met
+- **Returns**: Globally optimal rotation (score 76 in legacy mode, or first rotation meeting targets)
 
 ### 2. Greedy Search (`greedy_search`)
 - **Method**: Always picks best immediate action with balance penalty
-- **Use Case**: Quick approximation (achieves score ~54)
+- **Parameters**: `target_completion=0, target_perfection=0` — when provided, penalizes overshooting targets and stops early when met
+- **Use Case**: Quick approximation (achieves score ~54 in legacy mode)
 
 ### 3. Forecast-Aware Lookahead (`suggest_next_turn`)
 - **Method**: DFS with memoization over control forecast horizon
-- **Input**: Current state + list of control multipliers for upcoming turns
-- **Returns**: Best first action, full plan, and horizon score
+- **Input**: Current state + list of control multipliers for upcoming turns + optional targets
+- **Parameters**: `target_completion=0, target_perfection=0` — when provided, optimizes toward targets and stops early when met
+- **Returns**: Best first action, full plan, and horizon score/progress
 
 **Important**: Only `suggest_next_turn` is condition-aware. `search_optimal()` and `greedy_search()` assume neutral control condition (`1.0`) every turn.
 
@@ -129,21 +135,43 @@ self.skills = {
 
 ## CLI Usage
 
-### Basic Optimal Search
+### Command Line Options
+
+| Short | Long | Description |
+|-------|------|-------------|
+| `-i` | `--interactive` | Interactive mode (turn-by-turn) |
+| `-t` | `--targets` | Set both targets at once: `-t 60 60` |
+| `-c` | `--target-completion` | Target completion value |
+| `-p` | `--target-perfection` | Target perfection value |
+| `-s` | `--suggest-next` | Suggest best action for forecast |
+| `-f` | `--forecast-control` | Control forecast (e.g. `1.5,1,0.5,1`) |
+| | `--config` | Path to custom config file |
+
+### Target-Based Optimal Search (Recommended)
+```bash
+python3 wuxia_crafting_optimizer.py -t 50 50
+```
+Finds the optimal rotation to reach the specified completion and perfection targets. Use `-t COMP PERF` as shorthand, or `-c COMP -p PERF` for separate flags.
+
+### Legacy Optimal Search (Balanced Mode)
 ```bash
 python3 wuxia_crafting_optimizer.py
 ```
-Outputs: Optimal rotation, detailed step-by-step breakdown, greedy comparison.
+Without targets, maximizes `min(completion, perfection)`. Outputs: Optimal rotation, detailed step-by-step breakdown, greedy comparison.
 
 ### Using a Configuration File
 ```bash
-python3 wuxia_crafting_optimizer.py --config config.json
+python3 wuxia_crafting_optimizer.py --config config.json -t 50 50
 ```
 Load stats and skills from a JSON configuration file instead of using hardcoded defaults. See [Configuration File](#configuration-file) section for format details.
 
 ### Forecast-Aware Suggestion
 ```bash
-python3 wuxia_crafting_optimizer.py --suggest-next --forecast-control '1.5,1,0.5,1'
+# With targets
+python3 wuxia_crafting_optimizer.py -s -f '1.5,1,0.5,1' -t 50 50
+
+# Legacy mode (balanced scoring)
+python3 wuxia_crafting_optimizer.py -s -f '1.5,1,0.5,1'
 ```
 - When mirroring the game UI, provide exactly **4** values: `[t, t+1, t+2, t+3]` (current turn first).
 - `1.5` = +50% control this turn
@@ -152,17 +180,22 @@ python3 wuxia_crafting_optimizer.py --suggest-next --forecast-control '1.5,1,0.5
 
 ### Interactive Mode
 ```bash
-python3 wuxia_crafting_optimizer.py --interactive
+# With targets (recommended)
+python3 wuxia_crafting_optimizer.py -i -t 60 60
+
+# Legacy mode (balanced scoring)
+python3 wuxia_crafting_optimizer.py -i
 ```
 Step-by-step crafting session with turn-by-turn forecast input. Ideal for playing alongside the game in real-time.
 
 **Turn Flow:**
-1. Show turn status and current state
+1. Show turn status and current state (with target progress if targets set)
 2. Show AI-suggested optimal action (using default forecast 1,1,1,1)
 3. Show available skills
 4. Ask for skill selection
 5. Ask for control forecast (only when proceeding to apply skill)
 6. Apply skill with the provided forecast
+7. Session ends automatically when both targets are met (if targets provided)
 
 **Features:**
 - Enter control forecast once per turn (4 values for current + next 3 turns), only when confirming skill
@@ -170,6 +203,8 @@ Step-by-step crafting session with turn-by-turn forecast input. Ideal for playin
 - Accept suggestion or choose a different skill (by number or partial name)
 - Ambiguous skill name detection (prompts for clarification when multiple skills match)
 - Visual progress bars for Qi, Stability, Completion, Perfection
+- Target progress display showing remaining completion/perfection needed (when targets set)
+- Automatic session completion when targets are met
 - Undo support to revert mistakes
 
 **Commands during interactive mode:**
@@ -305,7 +340,11 @@ Modify the default values in the `load_config()` function.
 4. Handle buff duration in `apply_skill()`
 
 ### Modifying Scoring Logic
-Change `State.get_score()` method. Current: `min(completion, perfection)`
+Change `State.get_score()` method. Current behavior:
+- With targets: `min(completion, target_completion) + min(perfection, target_perfection)`
+- Without targets (legacy): `min(completion, perfection)`
+
+The `targets_met()` method checks if both `completion >= target_completion` and `perfection >= target_perfection`.
 
 ---
 
@@ -337,13 +376,24 @@ Does NOT affect Disciplined Touch (scales with Intensity only).
 
 ## Testing Recommendations
 
-### Verify Optimal Score
+### Verify Optimal Score (Legacy Mode)
 ```python
 optimizer = CraftingOptimizer()
 state = optimizer.search_optimal()
 assert state.get_score() == 76
 assert state.completion == 80
 assert state.perfection == 76
+```
+
+### Verify Target-Based Search
+```python
+optimizer = CraftingOptimizer()
+state = optimizer.search_optimal(target_completion=50, target_perfection=50)
+assert state.targets_met(50, 50)
+assert state.completion >= 50
+assert state.perfection >= 50
+# Score with targets = min(completion, 50) + min(perfection, 50) = 100
+assert state.get_score(50, 50) == 100
 ```
 
 ### Test Buff Timing
@@ -368,7 +418,10 @@ assert new_state.perfection == 24  # 16 * 1.5 = 24
 
 ---
 
-## Known Optimal Rotation (Score: 76)
+## Known Optimal Rotations
+
+### Legacy Mode (Score: 76)
+Without targets, maximizes `min(completion, perfection)`:
 
 ```
 1. Energised Fusion      (+21 Completion)
@@ -385,6 +438,21 @@ assert new_state.perfection == 24  # 16 * 1.5 = 24
 
 **Final**: Completion=80, Perfection=76, Score=76
 
+### Target Mode Example (Targets: 50/50)
+With `-t 50 50`, finds shortest path to targets:
+
+```
+1. Energised Fusion      (+21 Completion)
+2. Energised Fusion      (+21 Completion)
+3. Cycling Refine        (+12 Perfection, grants Intensity buff)
+4. Disciplined Touch     (+8 Completion, +8 Perfection) [with Intensity buff]
+5. Simple Refine         (+16 Perfection)
+6. Simple Refine         (+16 Perfection)
+7. Cycling Refine        (+12 Perfection)
+```
+
+**Final**: Completion=50, Perfection=64, Targets Met ✓
+
 ---
 
 ## Troubleshooting
@@ -393,14 +461,24 @@ assert new_state.perfection == 24  # 16 * 1.5 = 24
 - Check if stability would drop below 10
 - Check if qi is sufficient for the action
 
-### Score lower than 76
+### Score lower than 76 (legacy mode)
 - Verify `min_stability = 10` constraint is enforced
 - Verify buff timing (buffs apply to subsequent turns)
 - Check that Pareto pruning isn't too aggressive
 
+### Targets not being met
+- Ensure targets are provided together (use `-t 50 50` or `-c 50 -p 50`)
+- Check if targets are achievable with current stats and resources
+- Verify the optimizer isn't stopping early due to resource constraints
+
 ### Forecast suggestions seem wrong
 - Verify control_condition only affects Control-scaling skills
 - Check that forecast list is in correct order (current turn first)
+
+### "Error: targets must be provided together"
+- Both target arguments are required when using target mode
+- Use `-t COMP PERF` shorthand, or `-c COMP -p PERF` for separate flags
+- Either provide both or neither (for legacy balanced mode)
 
 ---
 

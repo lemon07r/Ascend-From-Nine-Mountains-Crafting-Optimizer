@@ -1,17 +1,18 @@
 ### Ascend From Nine Mountains Crafting Optimizer
 
-A Python tool that finds the best skill rotation for the Ascend From Nine Mountains crafting system. It helps you maximize both completion and perfection bars before running out of stability.
+A Python tool that finds the best skill rotation for the Ascend From Nine Mountains crafting system. It helps you reach specific completion and perfection targets, or maximize both bars before running out of stability.
 
 ---
 
 ### What This Does
 
-In the game, crafting involves using skills that cost resources (Qi and Stability) to build up Completion and Perfection. This tool values both equally and tries to predict the most optimal skill choice to get the highest combination of both. 
+In the game, crafting involves using skills that cost resources (Qi and Stability) to build up Completion and Perfection. You can set specific targets for both values, and the optimizer will find the most efficient path to reach them.
 
 This optimizer:
-- Finds the mathematically best rotation of skills
+- Finds the mathematically best rotation of skills to reach your targets
 - Lets you play along with the game in real-time with turn-by-turn suggestions
 - Accounts for the random control conditions the game throws at you
+- Supports both target-based optimization and legacy balanced scoring
 
 ---
 
@@ -23,16 +24,23 @@ This optimizer:
 
 ### Quick Start
 
-**Find the optimal rotation:**
+**Find the optimal rotation with specific targets:**
+```bash
+python3 wuxia_crafting_optimizer.py -t 50 50
+```
+
+This runs an exhaustive search and shows you the best skill sequence to reach your completion and perfection targets.
+
+**Find the optimal rotation (legacy balanced mode):**
 ```bash
 python3 wuxia_crafting_optimizer.py
 ```
 
-This runs an exhaustive search and shows you the best possible skill sequence for your configured stats.
+Without targets, the optimizer maximizes `min(completion, perfection)` for a balanced score.
 
 **Play along with the game (interactive mode):**
 ```bash
-python3 wuxia_crafting_optimizer.py --interactive
+python3 wuxia_crafting_optimizer.py -i -t 60 60
 ```
 
 This is the most useful mode. Each turn:
@@ -40,6 +48,7 @@ This is the most useful mode. Each turn:
 2. Pick a skill (press Enter to accept suggestion, or type a number/name)
 3. Enter the control forecast from the game (4 numbers like `1.5,1,0.5,1`)
 4. The skill is applied with your forecast
+5. Session ends automatically when both targets are met
 
 ---
 
@@ -129,7 +138,8 @@ These are the skills included in the default `config.json`. Values can be custom
 **Goals:**
 - **Completion**: Build this up with fusion skills
 - **Perfection**: Build this up with refine skills
-- **Score**: The lower of the two (so balance matters)
+- **Targets**: Set specific completion and perfection values to reach
+- **Score** (legacy mode): Without targets, score = the lower of the two (so balance matters)
 
 **Buffs:**
 - Cycling skills grant buffs to either Control or Intensity (default: +40%)
@@ -190,22 +200,40 @@ $ python3 wuxia_crafting_optimizer.py --interactive
 
 ### All Command Line Options
 
+| Short | Long | Description |
+|-------|------|-------------|
+| `-i` | `--interactive` | Interactive mode (turn-by-turn) |
+| `-t` | `--targets` | Set both targets at once: `-t 60 60` |
+| `-c` | `--target-completion` | Target completion value |
+| `-p` | `--target-perfection` | Target perfection value |
+| `-s` | `--suggest-next` | Suggest best action for forecast |
+| `-f` | `--forecast-control` | Control forecast (e.g. `1.5,1,0.5,1`) |
+| | `--config` | Path to custom config file |
+
 ```bash
-# Find optimal rotation (default)
+# Find optimal rotation with targets (recommended)
+python3 wuxia_crafting_optimizer.py -t 50 50
+
+# Interactive mode with targets
+python3 wuxia_crafting_optimizer.py -i -t 60 60
+
+# Interactive mode (legacy balanced mode)
+python3 wuxia_crafting_optimizer.py -i
+
+# Get suggestion for a specific forecast with targets
+python3 wuxia_crafting_optimizer.py -s -f '1.5,1,0.5,1' -t 50 50
+
+# Legacy balanced mode (no targets)
 python3 wuxia_crafting_optimizer.py
 
-# Interactive mode
-python3 wuxia_crafting_optimizer.py --interactive
-
-# Get suggestion for a specific forecast
-python3 wuxia_crafting_optimizer.py --suggest-next --forecast-control '1.5,1,0.5,1'
-
 # Use custom config file
-python3 wuxia_crafting_optimizer.py --config config.json
+python3 wuxia_crafting_optimizer.py --config config.json -t 50 50
 
 # Show help
 python3 wuxia_crafting_optimizer.py --help
 ```
+
+**Note:** Use `-t 60 60` as shorthand, or `-c 60 -p 60` for separate target flags. Both completion and perfection targets must be provided together.
 
 ---
 

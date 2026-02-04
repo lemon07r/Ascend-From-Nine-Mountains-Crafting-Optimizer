@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
 Ascend From Nine Mountains - Crafting Optimizer
-Finds the optimal skill rotation to maximize completion and perfection
+Finds the optimal skill rotation to reach target completion and perfection
 before running out of stability.
 
 Rules:
 - Each action costs 10 stability unless it restores stability
 - Stability MUST be restored BEFORE going below 10
-- Goal: Maximize min(completion, perfection)
+- Goal: Reach target completion and perfection values
 """
 
 from dataclasses import dataclass
@@ -56,9 +56,21 @@ class State:
             return int(base_intensity * 1.4)
         return base_intensity
 
-    def get_score(self) -> int:
-        """Score is the minimum of completion and perfection (we want both high)"""
-        return min(self.completion, self.perfection)
+    def get_score(self, target_completion: int = 0, target_perfection: int = 0) -> int:
+        """Score based on progress toward targets.
+        
+        If targets are 0, falls back to min(completion, perfection) for backward compatibility.
+        Otherwise, returns sum of min(actual, target) for both metrics.
+        """
+        if target_completion == 0 and target_perfection == 0:
+            return min(self.completion, self.perfection)
+        comp_progress = min(self.completion, target_completion)
+        perf_progress = min(self.perfection, target_perfection)
+        return comp_progress + perf_progress
+    
+    def targets_met(self, target_completion: int, target_perfection: int) -> bool:
+        """Check if both targets have been reached."""
+        return self.completion >= target_completion and self.perfection >= target_perfection
 
     def get_total(self) -> int:
         """Total of completion and perfection"""
@@ -66,7 +78,7 @@ class State:
 
     def __lt__(self, other):
         """For priority queue - higher score is better"""
-        return self.get_score() > other.get_score()
+        return self.get_score(0, 0) > other.get_score(0, 0)
 
     def __str__(self):
         return (
@@ -353,8 +365,12 @@ class CraftingOptimizer:
         prev_node_idx: Optional[int]
         action_name: Optional[str]
 
-        def score(self) -> int:
-            return min(self.completion, self.perfection)
+        def score(self, target_completion: int = 0, target_perfection: int = 0) -> int:
+            if target_completion == 0 and target_perfection == 0:
+                return min(self.completion, self.perfection)
+            comp_progress = min(self.completion, target_completion)
+            perf_progress = min(self.perfection, target_perfection)
+            return comp_progress + perf_progress
 
     def _dominates(self, a: "CraftingOptimizer._Node", b: "CraftingOptimizer._Node") -> bool:
         return a.completion >= b.completion and a.perfection >= b.perfection
@@ -403,12 +419,15 @@ class CraftingOptimizer:
         actions.reverse()
         return actions
 
-    def search_optimal(self) -> State:
+    def search_optimal(self, target_completion: int = 0, target_perfection: int = 0) -> State:
         """Exhaustive search with Pareto-pruning over resource states.
 
         Unlike the original depth-limited BFS, this explores until no further
         actions are possible, while pruning dominated (completion, perfection)
         pairs for the same (qi, stability, buffs).
+        
+        If target_completion and target_perfection are provided (non-zero),
+        the search optimizes toward reaching those targets.
         """
         start_res = self._Resources(
             qi=self.max_qi,
@@ -433,7 +452,7 @@ class CraftingOptimizer:
         while q:
             res, idx = q.popleft()
             node = frontier[res][idx]
-            if node.score() > frontier[best_res][best_idx].score():
+            if node.score(target_completion, target_perfection) > frontier[best_res][best_idx].score(target_completion, target_perfection):
                 best_res, best_idx = res, idx
 
             state = State(
@@ -481,8 +500,11 @@ class CraftingOptimizer:
             history=history,
         )
 
-    def greedy_search(self) -> State:
-        """Greedy approach: always pick the best immediate action"""
+    def greedy_search(self, target_completion: int = 0, target_perfection: int = 0) -> State:
+        """Greedy approach: always pick the best immediate action.
+        
+        If targets are provided, prioritizes actions that move toward those targets.
+        """
         state = State(
             qi=self.max_qi,
             stability=self.max_stability,
@@ -494,16 +516,29 @@ class CraftingOptimizer:
         )
 
         while not self.is_terminal(state):
+            # Stop early if targets are met
+            if target_completion > 0 and target_perfection > 0:
+                if state.targets_met(target_completion, target_perfection):
+                    break
+            
             best_next = None
             best_score = -1
 
             for skill_key in self.skills:
                 new_state = self.apply_skill(state, skill_key)
                 if new_state is not None:
-                    score = new_state.get_score()
-                    # Prioritize balance between completion and perfection
-                    diff = abs(new_state.completion - new_state.perfection)
-                    score -= diff * 0.5  # Penalize imbalance
+                    if target_completion > 0 or target_perfection > 0:
+                        # Score based on progress toward targets
+                        score = new_state.get_score(target_completion, target_perfection)
+                        # Penalize going over targets (wasted resources)
+                        comp_over = max(0, new_state.completion - target_completion)
+                        perf_over = max(0, new_state.perfection - target_perfection)
+                        score -= (comp_over + perf_over) * 0.5
+                    else:
+                        # Legacy behavior: balance completion and perfection
+                        score = new_state.get_score()
+                        diff = abs(new_state.completion - new_state.perfection)
+                        score -= diff * 0.5  # Penalize imbalance
 
                     if score > best_score:
                         best_score = score
@@ -535,14 +570,28 @@ class CraftingOptimizer:
 
         return state
 
-    def print_state(self, state: State):
+    def print_state(self, state: State, target_completion: int = 0, target_perfection: int = 0):
         """Pretty print a state"""
         print(f"  Qi: {state.qi}/{self.max_qi}")
         print(f"  Stability: {state.stability}/{self.max_stability}")
-        print(f"  Completion: {state.completion}")
-        print(f"  Perfection: {state.perfection}")
-        print(f"  Score (min): {state.get_score()}")
-        print(f"  Balance: {abs(state.completion - state.perfection)}")
+        if target_completion > 0:
+            print(f"  Completion: {state.completion}/{target_completion}")
+        else:
+            print(f"  Completion: {state.completion}")
+        if target_perfection > 0:
+            print(f"  Perfection: {state.perfection}/{target_perfection}")
+        else:
+            print(f"  Perfection: {state.perfection}")
+        if target_completion > 0 and target_perfection > 0:
+            if state.targets_met(target_completion, target_perfection):
+                print(f"  Status: ✓ TARGETS MET")
+            else:
+                comp_remaining = max(0, target_completion - state.completion)
+                perf_remaining = max(0, target_perfection - state.perfection)
+                print(f"  Remaining: Completion={comp_remaining}, Perfection={perf_remaining}")
+        else:
+            print(f"  Score (min): {state.get_score()}")
+            print(f"  Balance: {abs(state.completion - state.perfection)}")
         print(f"  History ({len(state.history)} actions):")
         for i, action in enumerate(state.history, 1):
             print(f"    {i}. {action}")
@@ -641,10 +690,13 @@ def suggest_next_turn(
     optimizer: CraftingOptimizer,
     state: State,
     control_forecast: List[float],
+    target_completion: int = 0,
+    target_perfection: int = 0,
 ) -> Tuple[Optional[str], List[str], int]:
     """Return (best_first_skill_key, best_plan_keys, best_score_at_horizon).
 
     Uses a deterministic lookahead over the provided `control_forecast` multipliers.
+    If targets are provided, optimizes toward reaching those targets.
     """
 
     if not control_forecast:
@@ -668,8 +720,15 @@ def suggest_next_turn(
         if k in memo:
             return memo[k]
 
+        # Stop early if targets are met
+        if target_completion > 0 and target_perfection > 0:
+            if st.targets_met(target_completion, target_perfection):
+                res = (st.get_score(target_completion, target_perfection), [])
+                memo[k] = res
+                return res
+
         if i >= len(control_forecast) or optimizer.is_terminal(st):
-            res = (st.get_score(), [])
+            res = (st.get_score(target_completion, target_perfection), [])
             memo[k] = res
             return res
 
@@ -687,7 +746,7 @@ def suggest_next_turn(
                 best_plan = [skill_key] + plan
 
         if best_val < 0:
-            res = (st.get_score(), [])
+            res = (st.get_score(target_completion, target_perfection), [])
         else:
             res = (best_val, best_plan)
         memo[k] = res
@@ -739,13 +798,13 @@ def _format_skill_details(optimizer: CraftingOptimizer, skill_key: str, state: S
     return ", ".join(parts) if parts else "(no effect)"
 
 
-def interactive_mode(optimizer: CraftingOptimizer):
+def interactive_mode(optimizer: CraftingOptimizer, target_completion: int = 0, target_perfection: int = 0):
     """Interactive mode: step through a craft session turn-by-turn.
 
     Each turn, the user inputs the next 4 control condition forecasts,
     the optimizer suggests the best action, and the user can accept or
     choose a different action. The state updates and the loop continues
-    until no valid actions remain.
+    until no valid actions remain or targets are met.
     """
     state = State(
         qi=optimizer.max_qi,
@@ -801,8 +860,11 @@ def interactive_mode(optimizer: CraftingOptimizer):
         print("│    • Press Enter alone to accept the suggested action             │")
         print("│                                                                    │")
         print("│  GOAL                                                             │")
-        print("│    Maximize your Score = min(Completion, Perfection)              │")
-        print("│    Keep both bars balanced for the best result!                   │")
+        if target_completion > 0 and target_perfection > 0:
+            print(f"│    Reach Completion={target_completion}, Perfection={target_perfection}".ljust(69) + "│")
+        else:
+            print("│    Maximize your Score = min(Completion, Perfection)              │")
+            print("│    Keep both bars balanced for the best result!                   │")
         print("│                                                                    │")
         print("│  COMMANDS: help, undo, status, quit                               │")
         print("└" + "─" * 68 + "┘")
@@ -829,7 +891,15 @@ def interactive_mode(optimizer: CraftingOptimizer):
         if state.control_buff_turns > 0:
             print(f"│    Control buff: {state.control_buff_turns} turn(s) remaining".ljust(69) + "│")
         print("├" + "─" * 68 + "┤")
-        print(f"│  SCORE: {state.get_score()} (min of Completion and Perfection)".ljust(69) + "│")
+        if target_completion > 0 and target_perfection > 0:
+            if state.targets_met(target_completion, target_perfection):
+                print(f"│  STATUS: ✓ TARGETS MET!".ljust(69) + "│")
+            else:
+                comp_remaining = max(0, target_completion - state.completion)
+                perf_remaining = max(0, target_perfection - state.perfection)
+                print(f"│  REMAINING: Completion={comp_remaining}, Perfection={perf_remaining}".ljust(69) + "│")
+        else:
+            print(f"│  SCORE: {state.get_score()} (min of Completion and Perfection)".ljust(69) + "│")
         print("└" + "─" * 68 + "┘")
         if state.history:
             print()
@@ -842,6 +912,12 @@ def interactive_mode(optimizer: CraftingOptimizer):
     skill_keys = list(optimizer.skills.keys())
 
     while not optimizer.is_terminal(state):
+        # Check if targets are met
+        if target_completion > 0 and target_perfection > 0:
+            if state.targets_met(target_completion, target_perfection):
+                print("\n  ✓ TARGETS MET! Ending craft session.")
+                break
+        
         # Turn header
         print("┌" + "─" * 68 + "┐")
         print("│" + f" TURN {turn} ".center(68) + "│")
@@ -851,8 +927,14 @@ def interactive_mode(optimizer: CraftingOptimizer):
         qi_bar = _make_bar(state.qi, optimizer.max_qi, 15)
         stab_bar = _make_bar(state.stability, optimizer.max_stability, 15)
         print(f"  Qi: {state.qi:3d}/{optimizer.max_qi} {qi_bar}   Stability: {state.stability:2d}/{optimizer.max_stability} {stab_bar}")
-        print(f"  Completion: {state.completion:3d}                    Perfection: {state.perfection:3d}")
-        print(f"  ══► SCORE: {state.get_score()}")
+        if target_completion > 0 and target_perfection > 0:
+            print(f"  Completion: {state.completion:3d}/{target_completion}                 Perfection: {state.perfection:3d}/{target_perfection}")
+            comp_remaining = max(0, target_completion - state.completion)
+            perf_remaining = max(0, target_perfection - state.perfection)
+            print(f"  ══► REMAINING: Comp={comp_remaining}, Perf={perf_remaining}")
+        else:
+            print(f"  Completion: {state.completion:3d}                    Perfection: {state.perfection:3d}")
+            print(f"  ══► SCORE: {state.get_score()}")
         
         # Show active buffs inline
         buffs = []
@@ -868,7 +950,9 @@ def interactive_mode(optimizer: CraftingOptimizer):
         default_forecast = [1.0, 1.0, 1.0, 1.0]
         
         # Get suggestion using default forecast
-        best_first, plan, horizon_score = suggest_next_turn(optimizer, state, default_forecast)
+        best_first, plan, horizon_score = suggest_next_turn(
+            optimizer, state, default_forecast, target_completion, target_perfection
+        )
 
         if best_first is None:
             print("\n  No valid action found from this state.")
@@ -881,7 +965,10 @@ def interactive_mode(optimizer: CraftingOptimizer):
         print("  └" + "─" * 50 + "┘")
         
         if plan and len(plan) > 1:
-            print(f"\n  Lookahead plan ({len(plan)} turns, expected score: {horizon_score}):")
+            if target_completion > 0 and target_perfection > 0:
+                print(f"\n  Lookahead plan ({len(plan)} turns, progress: {horizon_score}/{target_completion + target_perfection}):")
+            else:
+                print(f"\n  Lookahead plan ({len(plan)} turns, expected score: {horizon_score}):")
             for i, k in enumerate(plan, 1):
                 marker = "→" if i == 1 else " "
                 print(f"    {marker} {i}. {optimizer.skills[k][0]}")
@@ -1092,15 +1179,30 @@ def interactive_mode(optimizer: CraftingOptimizer):
     print(f"│  Qi Remaining:  {state.qi:3d}/{optimizer.max_qi}".ljust(69) + "│")
     print(f"│  Stability:     {state.stability:3d}/{optimizer.max_stability}".ljust(69) + "│")
     print("├" + "─" * 68 + "┤")
-    print(f"│  Completion:    {state.completion:3d}  {_make_bar(state.completion, 100, 30)}".ljust(69) + "│")
-    print(f"│  Perfection:    {state.perfection:3d}  {_make_bar(state.perfection, 100, 30)}".ljust(69) + "│")
+    if target_completion > 0 and target_perfection > 0:
+        comp_bar = _make_bar(state.completion, target_completion, 30)
+        perf_bar = _make_bar(state.perfection, target_perfection, 30)
+        print(f"│  Completion:    {state.completion:3d}/{target_completion}  {comp_bar}".ljust(69) + "│")
+        print(f"│  Perfection:    {state.perfection:3d}/{target_perfection}  {perf_bar}".ljust(69) + "│")
+    else:
+        print(f"│  Completion:    {state.completion:3d}  {_make_bar(state.completion, 100, 30)}".ljust(69) + "│")
+        print(f"│  Perfection:    {state.perfection:3d}  {_make_bar(state.perfection, 100, 30)}".ljust(69) + "│")
     print("├" + "─" * 68 + "┤")
-    score = state.get_score()
-    print(f"│  ★ FINAL SCORE: {score}".ljust(69) + "│")
-    if state.completion != state.perfection:
-        diff = abs(state.completion - state.perfection)
-        lower = "Completion" if state.completion < state.perfection else "Perfection"
-        print(f"│    (Limited by {lower}, {diff} points behind)".ljust(69) + "│")
+    if target_completion > 0 and target_perfection > 0:
+        if state.targets_met(target_completion, target_perfection):
+            print(f"│  ★ TARGETS MET!".ljust(69) + "│")
+        else:
+            comp_remaining = max(0, target_completion - state.completion)
+            perf_remaining = max(0, target_perfection - state.perfection)
+            print(f"│  ✗ Targets not fully reached".ljust(69) + "│")
+            print(f"│    Remaining: Completion={comp_remaining}, Perfection={perf_remaining}".ljust(69) + "│")
+    else:
+        score = state.get_score()
+        print(f"│  ★ FINAL SCORE: {score}".ljust(69) + "│")
+        if state.completion != state.perfection:
+            diff = abs(state.completion - state.perfection)
+            lower = "Completion" if state.completion < state.perfection else "Perfection"
+            print(f"│    (Limited by {lower}, {diff} points behind)".ljust(69) + "│")
     print("└" + "─" * 68 + "┘")
     
     if state.history:
@@ -1120,7 +1222,7 @@ def main():
         help="Path to JSON configuration file for stats and skills. If not provided, uses default values.",
     )
     parser.add_argument(
-        "--forecast-control",
+        "-f", "--forecast-control",
         type=_parse_control_forecast,
         default=None,
         help=(
@@ -1129,16 +1231,45 @@ def main():
         ),
     )
     parser.add_argument(
-        "--suggest-next",
+        "-s", "--suggest-next",
         action="store_true",
         help="Suggest the best next action using lookahead over --forecast-control.",
     )
     parser.add_argument(
-        "--interactive",
+        "-i", "--interactive",
         action="store_true",
         help="Run in interactive mode: step through a craft session turn-by-turn.",
     )
+    parser.add_argument(
+        "-c", "--target-completion",
+        type=int,
+        default=0,
+        help="Target completion value to reach. Required with -p/--target-perfection.",
+    )
+    parser.add_argument(
+        "-p", "--target-perfection",
+        type=int,
+        default=0,
+        help="Target perfection value to reach. Required with -c/--target-completion.",
+    )
+    parser.add_argument(
+        "-t", "--targets",
+        nargs=2,
+        type=int,
+        metavar=("COMPLETION", "PERFECTION"),
+        help="Shorthand for targets: -t 60 60 is equivalent to -c 60 -p 60.",
+    )
     args = parser.parse_args()
+
+    # Handle -t/--targets shorthand
+    if args.targets:
+        if args.target_completion > 0 or args.target_perfection > 0:
+            raise SystemExit("Cannot use -t/--targets together with -c/--target-completion or -p/--target-perfection.")
+        args.target_completion, args.target_perfection = args.targets
+
+    # Validate targets - both must be provided together
+    if (args.target_completion > 0) != (args.target_perfection > 0):
+        raise SystemExit("Both -c/--target-completion and -p/--target-perfection must be provided together (or use -t).")
 
     optimizer = CraftingOptimizer(config_path=args.config)
 
@@ -1153,11 +1284,14 @@ def main():
     print(f"\nRules:")
     print(f"  - Each action costs 10 stability (except restoration skills)")
     print(f"  - Stability must stay >= {optimizer.min_stability} (restore before dropping below)")
-    print(f"  - Goal: Maximize min(Completion, Perfection)")
+    if args.target_completion > 0 and args.target_perfection > 0:
+        print(f"  - Goal: Reach Completion={args.target_completion}, Perfection={args.target_perfection}")
+    else:
+        print(f"  - Goal: Maximize min(Completion, Perfection)")
     print()
 
     if args.interactive:
-        interactive_mode(optimizer)
+        interactive_mode(optimizer, args.target_completion, args.target_perfection)
         return
 
     if args.suggest_next:
@@ -1180,11 +1314,16 @@ def main():
             history=[],
         )
 
-        best_first, plan, horizon_score = suggest_next_turn(optimizer, start_state, args.forecast_control)
+        best_first, plan, horizon_score = suggest_next_turn(
+            optimizer, start_state, args.forecast_control,
+            args.target_completion, args.target_perfection
+        )
         print("=" * 70)
         print("NEXT-TURN SUGGESTION")
         print("=" * 70)
         print(f"\nControl forecast: {', '.join(f'x{m:g}' for m in args.forecast_control)}")
+        if args.target_completion > 0 and args.target_perfection > 0:
+            print(f"Targets: Completion={args.target_completion}, Perfection={args.target_perfection}")
         if best_first is None:
             print("\nNo valid action found from this state.")
             return
@@ -1194,7 +1333,10 @@ def main():
             for i, k in enumerate(plan, 1):
                 print(f"  {i}. {optimizer.skills[k][0]}")
             optimizer.print_detailed_rotation(plan, control_conditions=args.forecast_control)
-        print(f"\nHorizon score (min) after lookahead: {horizon_score}")
+        if args.target_completion > 0 and args.target_perfection > 0:
+            print(f"\nHorizon progress after lookahead: {horizon_score}/{args.target_completion + args.target_perfection}")
+        else:
+            print(f"\nHorizon score (min) after lookahead: {horizon_score}")
         return
 
     print("=" * 70)
@@ -1203,12 +1345,12 @@ def main():
 
     # Exhaustive search for optimal
     print("\nRunning exhaustive search (this may take a moment)...")
-    optimal_state = optimizer.search_optimal()
+    optimal_state = optimizer.search_optimal(args.target_completion, args.target_perfection)
 
     print("\n" + "-" * 70)
     print("OPTIMAL ROTATION FOUND")
     print("-" * 70)
-    optimizer.print_state(optimal_state)
+    optimizer.print_state(optimal_state, args.target_completion, args.target_perfection)
 
     # Get skill keys from history names for detailed breakdown
     rotation_keys = []
@@ -1221,16 +1363,24 @@ def main():
     print("\n" + "-" * 70)
     print("GREEDY SEARCH (for comparison)")
     print("-" * 70)
-    greedy_state = optimizer.greedy_search()
-    optimizer.print_state(greedy_state)
+    greedy_state = optimizer.greedy_search(args.target_completion, args.target_perfection)
+    optimizer.print_state(greedy_state, args.target_completion, args.target_perfection)
 
     # Final recommendation
     print("\n" + "=" * 70)
     print("RECOMMENDED SKILL ROTATION")
     print("=" * 70)
-    print(f"\nBest Score: {optimal_state.get_score()} (min of Completion and Perfection)")
-    print(f"Final Completion: {optimal_state.completion}")
-    print(f"Final Perfection: {optimal_state.perfection}")
+    if args.target_completion > 0 and args.target_perfection > 0:
+        if optimal_state.targets_met(args.target_completion, args.target_perfection):
+            print(f"\n✓ TARGETS MET!")
+        else:
+            print(f"\n✗ Targets not fully reached")
+        print(f"Target Completion: {args.target_completion}, Achieved: {optimal_state.completion}")
+        print(f"Target Perfection: {args.target_perfection}, Achieved: {optimal_state.perfection}")
+    else:
+        print(f"\nBest Score: {optimal_state.get_score()} (min of Completion and Perfection)")
+        print(f"Final Completion: {optimal_state.completion}")
+        print(f"Final Perfection: {optimal_state.perfection}")
     print(f"\nUse these skills in order:")
     for i, action in enumerate(optimal_state.history, 1):
         print(f"  {i}. {action}")
