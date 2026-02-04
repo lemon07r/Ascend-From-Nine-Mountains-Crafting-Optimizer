@@ -842,6 +842,10 @@ def interactive_mode(optimizer: CraftingOptimizer, target_completion: int = 0, t
     
     # Keep history of states for undo
     state_history = []
+    # Keep history of forecasts for undo
+    forecast_history = []
+    # Current forecast (will be updated each turn)
+    current_forecast = None
     
     turn = 1
 
@@ -853,8 +857,9 @@ def interactive_mode(optimizer: CraftingOptimizer, target_completion: int = 0, t
     print("┌" + "─" * 68 + "┐")
     print("│" + " COMMANDS ".center(68) + "│")
     print("├" + "─" * 68 + "┤")
-    print("│  Forecast: Enter 4 control multipliers (e.g. '1.5,1,0.5,1')      │")
-    print("│            Press Enter for default (1,1,1,1)                     │")
+    print("│  Turn 1:   Enter all 4 control multipliers (e.g. '1.5,1,0.5,1')  │")
+    print("│  Turn 2+:  Previous forecast shifts; enter only the new T3 value │")
+    print("│            Or enter 4 values to override, Enter for default      │")
     print("│                                                                  │")
     print("│  Actions:  Enter number or name to select skill                  │")
     print("│            Press Enter to accept suggestion                      │")
@@ -872,11 +877,13 @@ def interactive_mode(optimizer: CraftingOptimizer, target_completion: int = 0, t
         print("│" + " HELP ".center(68) + "│")
         print("├" + "─" * 68 + "┤")
         print("│  FORECAST INPUT                                                   │")
-        print("│    Enter 4 comma-separated values for control conditions:         │")
+        print("│    Turn 1: Enter all 4 control conditions (current + next 3)     │")
+        print("│    Turn 2+: Previous forecast shifts automatically:              │")
+        print("│             T1→T0, T2→T1, T3→T2, then you enter new T3           │")
         print("│    • 1.5 = +50% control (good for perfection skills)              │")
         print("│    • 1.0 = normal control                                         │")
         print("│    • 0.5 = -50% control (bad for perfection skills)               │")
-        print("│    Example: '1.5,1,0.5,1' means +50% now, normal, -50%, normal    │")
+        print("│    You can also enter 4 values to override the entire forecast   │")
         print("│                                                                    │")
         print("│  SKILL SELECTION                                                  │")
         print("│    • Enter the number next to a skill to use it                   │")
@@ -982,12 +989,107 @@ def interactive_mode(optimizer: CraftingOptimizer, target_completion: int = 0, t
             print(f"  Active Buffs: {', '.join(buffs)}")
         print()
 
-        # Use default forecast for displaying suggestions and available skills
-        default_forecast = [1.0, 1.0, 1.0, 1.0]
+        # Ask for forecast FIRST (player sees conditions before selecting skills)
+        # On turn 1, ask for all 4 values. On subsequent turns, shift and ask for new T3.
+        control_forecast = None
+        while True:
+            if current_forecast is None:
+                # First turn: ask for all 4 values
+                prompt = "► Forecast (e.g. '1.5,1,0.5,1') [Enter=default]: "
+            else:
+                # Subsequent turns: show shifted forecast and ask for new T3
+                shifted = current_forecast[1:4]  # T1, T2, T3 become T0, T1, T2
+                shifted_desc = []
+                for i, m in enumerate(shifted):
+                    if m > 1:
+                        shifted_desc.append(f"+{int((m-1)*100)}%")
+                    elif m < 1:
+                        shifted_desc.append(f"{int((m-1)*100)}%")
+                    else:
+                        shifted_desc.append("1")
+                print(f"  Previous forecast shifted: T0={shifted_desc[0]}, T1={shifted_desc[1]}, T2={shifted_desc[2]}")
+                prompt = "► New T3 value (e.g. '1.5') [Enter=1, or 4 values to override]: "
+            
+            try:
+                forecast_input = input(prompt).strip()
+            except EOFError:
+                print("\n  Goodbye!")
+                return
+
+            if forecast_input.lower() in ('quit', 'q'):
+                print("\n  Goodbye!")
+                return
+            
+            if forecast_input.lower() in ('help', 'h'):
+                show_help()
+                continue
+            
+            if forecast_input.lower() in ('status', 's'):
+                show_status()
+                continue
+            
+            if forecast_input.lower() in ('undo', 'u'):
+                if state_history:
+                    state = state_history.pop()
+                    current_forecast = forecast_history.pop() if forecast_history else None
+                    turn -= 1
+                    print(f"  ↩ Undone! Back to turn {turn}.")
+                    print()
+                    control_forecast = None  # Signal to redo turn
+                    break
+                else:
+                    print("  Nothing to undo.")
+                continue
+
+            if not forecast_input:
+                if current_forecast is None:
+                    # First turn default
+                    control_forecast = [1.0, 1.0, 1.0, 1.0]
+                else:
+                    # Subsequent turns: shift and add default T3=1.0
+                    control_forecast = current_forecast[1:4] + [1.0]
+                break
+
+            try:
+                parsed = _parse_control_forecast(forecast_input)
+                if len(parsed) == 1 and current_forecast is not None:
+                    # Single value: use as new T3, shift the rest
+                    control_forecast = current_forecast[1:4] + parsed
+                    break
+                elif len(parsed) == 4:
+                    # Full override with 4 values
+                    control_forecast = parsed
+                    break
+                elif current_forecast is None:
+                    print("  ✗ Please enter exactly 4 values for the first turn.")
+                    continue
+                else:
+                    print("  ✗ Enter 1 value (new T3) or 4 values (full override).")
+                    continue
+            except argparse.ArgumentTypeError as e:
+                print(f"  ✗ Invalid input: {e}")
+                continue
+
+        # Handle undo from forecast prompt
+        if control_forecast is None:
+            continue
+
+        # Show forecast interpretation if not default
+        if control_forecast != [1.0, 1.0, 1.0, 1.0]:
+            forecast_desc = []
+            for i, m in enumerate(control_forecast):
+                if m > 1:
+                    forecast_desc.append(f"T{i}: +{int((m-1)*100)}%")
+                elif m < 1:
+                    forecast_desc.append(f"T{i}: {int((m-1)*100)}%")
+                else:
+                    forecast_desc.append(f"T{i}: normal")
+            print(f"  Forecast: {' │ '.join(forecast_desc)}")
+            print()
         
-        # Get suggestion using default forecast
+        # Get suggestion using the provided forecast
         best_first, plan, horizon_score = suggest_next_turn(
-            optimizer, state, default_forecast, target_completion, target_perfection
+            optimizer, state, control_forecast, target_completion, target_perfection
         )
 
         if best_first is None:
@@ -997,7 +1099,7 @@ def interactive_mode(optimizer: CraftingOptimizer, target_completion: int = 0, t
         # Show suggestion with box
         print("  ┌" + "─" * 50 + "┐")
         print(f"  │ ★ SUGGESTED: {optimizer.skills[best_first][0]}".ljust(52) + "│")
-        print(f"  │   {_format_skill_details(optimizer, best_first, state, default_forecast[0])}".ljust(52) + "│")
+        print(f"  │   {_format_skill_details(optimizer, best_first, state, control_forecast[0])}".ljust(52) + "│")
         print("  └" + "─" * 50 + "┘")
         
         if plan and len(plan) > 1:
@@ -1017,12 +1119,12 @@ def interactive_mode(optimizer: CraftingOptimizer, target_completion: int = 0, t
         print("  " + "─" * 60)
         valid_skills = []
         for i, sk in enumerate(skill_keys, 1):
-            test_state = optimizer.apply_skill(state, sk, control_condition=default_forecast[0])
+            test_state = optimizer.apply_skill(state, sk, control_condition=control_forecast[0])
             if test_state is not None:
                 skill_info = optimizer.skills[sk]
                 valid_skills.append((i, sk))
                 marker = " ★" if sk == best_first else "  "
-                details = _format_skill_details(optimizer, sk, state, default_forecast[0])
+                details = _format_skill_details(optimizer, sk, state, control_forecast[0])
                 print(f"  {marker} {i}. {skill_info[0]:<22} {details}")
         print("  " + "─" * 60)
 
@@ -1103,76 +1205,15 @@ def interactive_mode(optimizer: CraftingOptimizer, target_completion: int = 0, t
         if redo_turn:
             continue
 
-        # Now get the control forecast for this turn
-        control_forecast = None
-        while True:
-            try:
-                forecast_input = input("\n► Forecast (e.g. '1.5,1,0.5,1') [Enter=default]: ").strip()
-            except EOFError:
-                print("\n  Goodbye!")
-                return
-
-            if forecast_input.lower() in ('quit', 'q'):
-                print("\n  Goodbye!")
-                return
-            
-            if forecast_input.lower() in ('help', 'h'):
-                show_help()
-                continue
-            
-            if forecast_input.lower() in ('status', 's'):
-                show_status()
-                continue
-            
-            if forecast_input.lower() in ('undo', 'u'):
-                if state_history:
-                    state = state_history.pop()
-                    turn -= 1
-                    print(f"  ↩ Undone! Back to turn {turn}.")
-                    print()
-                    redo_turn = True
-                    break  # Re-display the turn
-                else:
-                    print("  Nothing to undo.")
-                continue
-
-            if not forecast_input:
-                control_forecast = [1.0, 1.0, 1.0, 1.0]
-                break
-
-            try:
-                control_forecast = _parse_control_forecast(forecast_input)
-                if len(control_forecast) != 4:
-                    print("  ✗ Please enter exactly 4 values (current turn + next 3).")
-                    continue
-                break
-            except argparse.ArgumentTypeError as e:
-                print(f"  ✗ Invalid input: {e}")
-                continue
-
-        if redo_turn:
-            continue
-
-        # Show forecast interpretation if not default
-        if control_forecast != [1.0, 1.0, 1.0, 1.0]:
-            forecast_desc = []
-            for i, m in enumerate(control_forecast):
-                if m > 1:
-                    forecast_desc.append(f"T{i}: +{int((m-1)*100)}%")
-                elif m < 1:
-                    forecast_desc.append(f"T{i}: {int((m-1)*100)}%")
-                else:
-                    forecast_desc.append(f"T{i}: normal")
-            print(f"  Forecast: {' │ '.join(forecast_desc)}")
-
         # Apply the chosen skill
         new_state = optimizer.apply_skill(state, chosen_key, control_condition=control_forecast[0])
         if new_state is None:
             print(f"\n  ✗ Error: Could not apply {optimizer.skills[chosen_key][0]}. This shouldn't happen.")
             break
 
-        # Save state for undo
+        # Save state and forecast for undo
         state_history.append(state)
+        forecast_history.append(current_forecast)
 
         # Show what happened
         skill_name = optimizer.skills[chosen_key][0]
@@ -1200,6 +1241,7 @@ def interactive_mode(optimizer: CraftingOptimizer, target_completion: int = 0, t
         print("  ╚" + "═" * 50 + "╝")
 
         state = new_state
+        current_forecast = control_forecast  # Save for next turn's shift
         turn += 1
         print()
 

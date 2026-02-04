@@ -190,22 +190,26 @@ Step-by-step crafting session with turn-by-turn forecast input. Ideal for playin
 
 **Turn Flow:**
 1. Show turn status and current state (with target progress if targets set)
-2. Show AI-suggested optimal action (using default forecast 1,1,1,1)
-3. Show available skills
-4. Ask for skill selection
-5. Ask for control forecast (only when proceeding to apply skill)
+2. Ask for control forecast:
+   - **Turn 1:** Enter all 4 values (current + next 3 turns)
+   - **Turn 2+:** Previous forecast shifts automatically (T1→T0, T2→T1, T3→T2), then enter only the new T3 value
+3. Show AI-suggested optimal action (calculated using your forecast)
+4. Show available skills (with gains calculated using your forecast)
+5. Ask for skill selection
 6. Apply skill with the provided forecast
 7. Session ends automatically when both targets are met (if targets provided)
 
 **Features:**
-- Enter control forecast once per turn (4 values for current + next 3 turns), only when confirming skill
+- Enter control forecast first each turn (matches game UI where conditions are visible before skill selection)
+- **Forecast shifting:** After turn 1, previous forecast values shift automatically and you only enter the new T3 value (or 4 values to override)
+- AI suggestion calculated using your forecast for accurate recommendations
 - Get AI-suggested optimal action with lookahead plan (displayed only when 2+ actions planned)
 - Accept suggestion or choose a different skill (by number or partial name)
 - Ambiguous skill name detection (prompts for clarification when multiple skills match)
 - Visual progress bars for Qi, Stability, Completion, Perfection
 - Target progress display showing remaining completion/perfection needed (when targets set)
 - Automatic session completion when targets are met
-- Undo support to revert mistakes
+- Undo support to revert mistakes (also restores previous forecast)
 
 **Commands during interactive mode:**
 | Command | Description |
@@ -217,24 +221,40 @@ Step-by-step crafting session with turn-by-turn forecast input. Ideal for playin
 | `<number>` | Select skill by its number in the list |
 | `<partial name>` | Select skill by partial name match (e.g., "energised") |
 
-**Example session:**
+**Example session (Turn 1 - enter all 4 values):**
 ```
-  ┌──────────────────────────────────────────────────┐
-  │ ★ SUGGESTED: Simple Fusion                       │
-  │   0 Qi, -10 Stab, +12 Comp                       │
-  └──────────────────────────────────────────────────┘
-
-  Available skills:
-    1. Simple Fusion       0 Qi, -10 Stab, +12 Comp
-    2. Energised Fusion   -10 Qi, -10 Stab, +21 Comp
-    ...
-
-► Select skill [Enter=accept suggestion]: 
 ► Forecast (e.g. '1.5,1,0.5,1') [Enter=default]: 1.5,1,0.5,1
   Forecast: T0: +50% │ T1: normal │ T2: -50% │ T3: normal
 
   ┌──────────────────────────────────────────────────┐
-  │ ✓ Applied: Simple Fusion                         │
+  │ ★ SUGGESTED: Simple Refine                       │
+  │   -18 Qi, -10 Stab, +24 Perf                     │
+  └──────────────────────────────────────────────────┘
+
+  Available skills:
+    1. Simple Fusion       -10 Stab, +12 Comp
+    2. Energised Fusion   -10 Qi, -10 Stab, +21 Comp
+    ...
+  ★ 6. Simple Refine      -18 Qi, -10 Stab, +24 Perf
+    ...
+
+► Select skill [Enter=accept suggestion]: 
+
+  ╔══════════════════════════════════════════════════╗
+  ║ ✓ APPLIED: Simple Refine                        ║
+  ║   Qi -18 │ Stab -10 │ Perf +24                  ║
+  ╚══════════════════════════════════════════════════╝
+```
+
+**Example session (Turn 2+ - forecast shifts, enter only new T3):**
+```
+  Previous forecast shifted: T0=1, T1=-50%, T2=1
+► New T3 value (e.g. '1.5') [Enter=1, or 4 values to override]: 0.5
+  Forecast: T0: normal │ T1: -50% │ T2: normal │ T3: -50%
+
+  ┌──────────────────────────────────────────────────┐
+  │ ★ SUGGESTED: Energised Fusion                    │
+  │   -10 Qi, -10 Stab, +21 Comp                     │
   └──────────────────────────────────────────────────┘
 ```
 
